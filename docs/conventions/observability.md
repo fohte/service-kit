@@ -1,150 +1,139 @@
 # Observability conventions
 
-`@fohte/service-kit` (Node) と `fohte-service-kit` crate (Rust) が共有する観測層 (telemetry) の規約を定める。本ドキュメントを Source of Truth として扱い、Node / Rust いずれかの実装を変更する場合は両言語の実装と本ドキュメントを同一 PR で更新する。
+Conventions for the observability layer shared by `@fohte/service-kit` (Node) and `fohte-service-kit` (Rust crate). Treat this document as the source of truth: when the Node or Rust implementation changes, update both implementations and this document in the same PR.
 
-## 設計方針
+## Design policy
 
-### span と error の責務分離
+### Separate span and error responsibilities
 
-- span / metric / log は OpenTelemetry SDK 経由で OTLP exporter に送信し、Grafana (Tempo / Loki / Mimir 等) で観測する
-- error event は Sentry に送る (`Sentry.captureException` 経由、または unhandled exception を Sentry SDK が拾う経路)
-- Sentry 側に span を二重送信しないこと。具体的には `SentrySpanProcessor` および `SentrySampler` は組み込まない
-- Sentry SDK は trace context の伝播のためにのみ OpenTelemetry に接続する (`SentryPropagator` / `SentryContextManager` を OTel SDK に組み込む)
+- Span / metric / log: send via the OpenTelemetry SDK to an OTLP-compatible backend.
+- Error event: send to Sentry (via `Sentry.captureException`, or by letting the Sentry SDK pick up unhandled exceptions).
+- Do not double-send spans to Sentry. Specifically, do not register `SentrySpanProcessor` or `SentrySampler`.
+- The Sentry SDK is wired into OpenTelemetry only for trace-context propagation (register `SentryPropagator` and `SentryContextManager` on the OTel SDK).
 
-これにより Sentry の event quota は error event だけが消費する。
+This way the Sentry event quota is consumed by error events only.
 
-## 環境変数
+## Environment variables
 
-すべての service は以下の環境変数を読む。値は運用側の secret 注入機構 (secret store / CI secret 等) から流し込む想定で、library 側にデフォルト値を持たせない。
+Every service reads the following environment variables. Values are expected to be injected by the operator's secret-delivery mechanism; the library itself ships no defaults.
 
-| 環境変数                      | 必須 | 用途                                                                |
-| ----------------------------- | ---- | ------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | yes  | OTLP exporter の送信先 URL (例: Grafana Alloy / OTel Collector)     |
-| `OTEL_EXPORTER_OTLP_HEADERS`  | yes  | OTLP 認証ヘッダ (例: `Authorization=Basic ...`)                     |
-| `OTEL_SERVICE_NAME`           | yes  | `service.name` resource attribute と同値                            |
-| `OTEL_RESOURCE_ATTRIBUTES`    | no   | 追加の resource attribute (例: `deployment.environment=production`) |
-| `SENTRY_DSN`                  | yes  | Sentry プロジェクトの DSN                                           |
-| `SENTRY_ENVIRONMENT`          | yes  | Sentry の environment (例: `production` / `staging`)                |
-| `SENTRY_RELEASE`              | no   | リリース識別子 (git commit SHA 等)。CI から注入する                 |
+| Variable                      | Required | Purpose                                                                   |
+| ----------------------------- | -------- | ------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | yes      | OTLP exporter endpoint URL                                                |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | yes      | OTLP auth headers (e.g. `Authorization=Basic ...`)                        |
+| `OTEL_SERVICE_NAME`           | yes      | Same value as the `service.name` resource attribute                       |
+| `OTEL_RESOURCE_ATTRIBUTES`    | no       | Additional resource attributes (e.g. `deployment.environment=production`) |
+| `SENTRY_DSN`                  | yes      | Sentry project DSN                                                        |
+| `SENTRY_ENVIRONMENT`          | yes      | Sentry environment (e.g. `production`, `staging`)                         |
+| `SENTRY_RELEASE`              | no       | Release identifier (e.g. git commit SHA), injected from CI                |
 
-`OTEL_*` 系は OpenTelemetry の標準仕様に従う ([OpenTelemetry Environment Variable Specification](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/))。library 独自の prefix は導入しない。
+All `OTEL_*` variables follow the OpenTelemetry standard ([OpenTelemetry Environment Variable Specification](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/)). The library introduces no custom prefix.
 
-## Secret store パスの命名
+## Redact patterns
 
-secret store 上のキーは `/infra/<service>/<resource>` 形式で配置する。
+The library's default redactor masks sensitive values in logs, span attributes, and Sentry events by the following rules.
 
-例:
+- Mask the value when the key name matches one of the following case-insensitive regexes:
+  - `/_TOKEN$/i` (e.g. `SLACK_BOT_TOKEN`, `github_token`)
+  - `/_DSN$/i` (e.g. `SENTRY_DSN`, `database_dsn`)
+  - `/_API_KEY$/i` (e.g. `OPENAI_API_KEY`)
+- Mask the value of the HTTP header `Authorization` (case-insensitive).
 
-- `/infra/slack-bot/sentry-dsn`
-- `/infra/slack-bot/otel-exporter-otlp-headers`
+The masked value is replaced by the literal `[REDACTED]`. Services can extend the patterns through options.
 
-`<resource>` は kebab-case で書き、対応する環境変数名から `_` を `-` に置換した形を基本とする。Terraform 側で `aws_ssm_parameter` リソースを定義し、service の deployment manifest がこのパスを参照して環境変数に注入する。
+## Resource attributes
 
-## Redact パターン
+The OTel resource carries the following attributes.
 
-ログ / span attribute / Sentry event に含まれる機密値は、library 側の default redactor が以下のルールで一律に伏字化する。
+| Attribute                | Required | Example                                  |
+| ------------------------ | -------- | ---------------------------------------- |
+| `service.name`           | yes      | Same value as `OTEL_SERVICE_NAME`        |
+| `deployment.environment` | no       | `production` / `staging` / `development` |
 
-- key 名が以下の正規表現 (case-insensitive) にマッチする値は redact する
-  - `/_TOKEN$/i` (例: `SLACK_BOT_TOKEN`, `github_token`)
-  - `/_DSN$/i` (例: `SENTRY_DSN`, `database_dsn`)
-  - `/_API_KEY$/i` (例: `OPENAI_API_KEY`)
-- HTTP ヘッダ名 `Authorization` (case-insensitive) は値を redact する
+If `service.name` is missing, the library fails fast at init.
 
-redact 後の値は固定文字列 `[REDACTED]` に置き換える。pattern 追加は service 側から options で拡張できる。
+## Startup order
 
-## Resource attribute
+Initialize the observability layer in this order during service bootstrap.
 
-OTel resource には以下を付与する。
+1. **Sentry init**: call `Sentry.init({ dsn, environment, release, ... })` first. The Sentry SDK installs global hooks that must be in place before the OTel SDK starts.
+2. **Build the OTel SDK**: construct `NodeSDK` (Node) or `opentelemetry::sdk` (Rust). Register only `SentryPropagator` and `SentryContextManager` as the Sentry integration — do not add any Sentry-derived span processor or sampler.
+3. **`sdk.start()`**: start the OTel SDK.
+4. **`Sentry.validateOpenTelemetrySetup()`**: run Sentry's self-diagnostic to confirm the OTel wiring matches expectations.
 
-| Attribute                | 必須 | 値の例                                   |
-| ------------------------ | ---- | ---------------------------------------- |
-| `service.name`           | yes  | `slack-bot` (`OTEL_SERVICE_NAME` と同値) |
-| `deployment.environment` | no   | `production` / `staging` / `development` |
+Breaking this order disables Sentry's trace correlation or causes spans to be double-sent.
 
-`service.name` が無い場合は library が起動時 (init) にエラーで fail-fast する。
+## Shutdown order
 
-## 起動順序
-
-service の bootstrap 時、観測層の初期化は以下の順序で行う。
-
-1. **Sentry init**: `Sentry.init({ dsn, environment, release, ... })` を最初に呼ぶ。Sentry SDK は global state に hook を仕込むため OTel SDK より先である必要がある
-2. **OTel SDK 構築**: `NodeSDK` (Node) / `opentelemetry::sdk` (Rust) を構築する。このとき `SentryPropagator` と `SentryContextManager` のみを Sentry 連携として組み込み、span processor / sampler には Sentry 由来のものを入れない
-3. **`sdk.start()`**: OTel SDK を起動する
-4. **`Sentry.validateOpenTelemetrySetup()`**: Sentry 側の自己診断を呼び、OTel との接続が想定どおりであることを確認する
-
-上記順序を崩すと、Sentry の trace 連携が無効化されたり、span 二重送信が発生したりする。
-
-## Shutdown 順序
-
-SIGTERM / SIGINT を受け取ったら、両 SDK の flush を並行に行う。
+On SIGTERM / SIGINT, flush both SDKs concurrently.
 
 ```ts
 await Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])
 ```
 
-- 並行に走らせる: どちらかの flush が遅延しても他方をブロックしない
-- `Promise.allSettled` を使う: 片方が reject しても残りを待つ
-- idempotent: 二重に SIGTERM が来ても安全に no-op で返るようにすること (`alreadyShuttingDown` フラグで guard)
-- timeout: 各 SDK に妥当な timeout (例: 5 秒) を渡し、shutdown が無限にハングしないようにする
+- Run concurrently: a slow flush on one side must not block the other.
+- Use `Promise.allSettled`: keep waiting for the other side even if one rejects.
+- Be idempotent: a duplicate SIGTERM must return safely as a no-op (guard with an `alreadyShuttingDown` flag).
+- Pass a sensible timeout (e.g. 5 seconds) to each SDK so shutdown cannot hang indefinitely.
 
-Rust 側も同様に `tokio::join!` で OTel exporter の flush と Sentry の `ClientInitGuard` drop / flush を並行に行う。
+The Rust side does the same with `tokio::join!`, flushing the OTel exporter and dropping / flushing Sentry's `ClientInitGuard` in parallel.
 
-## Node 章
+## Node
 
 ### API
 
-`@fohte/service-kit/observability` は単一のエントリポイント `initObservability` を export する。
+`@fohte/service-kit/observability` exports a single entry point, `initObservability`.
 
 ```ts
 import { initObservability } from '@fohte/service-kit/observability'
 
 const observability = initObservability(process.env, {
-  // 任意の拡張オプション
+  // optional extensions
 })
 
 process.on('SIGTERM', () => observability.shutdown())
 process.on('SIGINT', () => observability.shutdown())
 ```
 
-`initObservability(env, options)` は以下を行う。
+`initObservability(env, options)` does the following:
 
-1. `env` を読み、必須環境変数の不足を fail-fast で検出する
-2. Sentry を init する
-3. `NodeSDK` を構築し、`SentryPropagator` / `SentryContextManager` を組み込んで `start()` を呼ぶ
-4. `Sentry.validateOpenTelemetrySetup()` を呼ぶ
-5. `shutdown()` メソッドを持つ handle を返す。`shutdown()` は idempotent で、`Promise.allSettled([sdk.shutdown(), Sentry.close(5000)])` を実行する
+1. Read `env` and fail fast if any required variable is missing.
+2. Initialize Sentry.
+3. Build `NodeSDK`, register `SentryPropagator` and `SentryContextManager`, and call `start()`.
+4. Call `Sentry.validateOpenTelemetrySetup()`.
+5. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(5000)])`.
 
-### Options 早見表
+### Options
 
-| Option                   | 型                                              | 用途                                                                                                  |
-| ------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `extraSecretKeyPatterns` | `RegExp[]`                                      | default の `*_TOKEN` / `*_DSN` / `*_API_KEY` / `Authorization` に追加する redact 対象 key パターン    |
-| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | 特定のキー名にマッチする string 値を任意長で切り詰める (例: Slack message 本文を 200 文字で truncate) |
-| `extraSpanProcessors`    | `SpanProcessor[]`                               | OTel SDK に追加する span processor                                                                    |
-| `extraInstrumentations`  | `Instrumentation[]`                             | 追加の auto-instrumentation                                                                           |
-| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Sentry init に追加で渡すオプション (`tracesSampleRate` 等)                                            |
+| Option                   | Type                                            | Purpose                                                                                                               |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (`/_TOKEN$/i`, `/_DSN$/i`, `/_API_KEY$/i`, `Authorization`). |
+| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters.                                         |
+| `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                                                               |
+| `extraInstrumentations`  | `Instrumentation[]`                             | Additional auto-instrumentations.                                                                                     |
+| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).                                                   |
 
-例えば slack-bot の `SLACK_MESSAGE_KEY_PATTERN` + 200 文字切詰めは、library 改修を必要とせず以下のように options だけで表現できる。
+A service-specific rule such as "truncate the body of a chat message to 200 characters" is expressible through options alone, without modifying the library:
 
 ```ts
 initObservability(process.env, {
   extraStringTruncators: [
-    { pattern: /^slack\.message\.text$/i, maxLength: 200 },
+    { pattern: /^chat\.message\.body$/i, maxLength: 200 },
   ],
 })
 ```
 
-### 依存
+### Dependencies
 
-`@sentry/node` と `@opentelemetry/*` は重量級のため `peerDependencies` + `peerDependenciesMeta.optional` で宣言する。service 側が必要なバージョンを直接インストールする方針 (`@fohte/service-kit` 本体は薄く保つ)。
+`@sentry/node` and the `@opentelemetry/*` packages are heavy, so they are declared as `peerDependencies` with `peerDependenciesMeta.optional`. Consumers install the versions they need directly, keeping `@fohte/service-kit` itself thin.
 
-## Rust 章
+## Rust
 
-Rust 実装は将来追加する。具体 API は実装時に確定するが、想定する構成は以下のとおり。
+The Rust implementation will come later. Concrete API names will be appended to this document at implementation time. The intended stack is:
 
-- `tracing` + `tracing-subscriber` を log / span の表面 API とする
-- `opentelemetry` + `opentelemetry-otlp` で OTLP exporter に送信する
-- `sentry` crate (`sentry-rust`) を error reporting に使い、`sentry-tracing` で `tracing` の `event::ERROR` を Sentry に橋渡しする
-- Node 側と同じく span を Sentry に二重送信しない (`sentry-opentelemetry` の span 連携は使わず、context 伝播のみ使う方針を検討中)
+- `tracing` + `tracing-subscriber` as the surface API for logs and spans.
+- `opentelemetry` + `opentelemetry-otlp` to send to the OTLP exporter.
+- The `sentry` crate (`sentry-rust`) for error reporting, with `sentry-tracing` bridging `tracing`'s `event::ERROR` to Sentry.
+- The same span/error split as on the Node side — spans are not double-sent to Sentry; only trace-context propagation crosses the boundary.
 
-crate の API シグネチャ、options 名、拡張ポイントは実装時に本ドキュメントに追記する。それまでは本章は規約 (環境変数 / redact / 起動順序 / shutdown 順序) を Rust でどう満たすかの方針宣言として扱う。
+Until the crate exists, this section is a policy statement for how Rust will satisfy the language-agnostic conventions (environment variables, redact patterns, startup order, shutdown order).

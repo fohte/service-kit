@@ -4,6 +4,6 @@
 
 ## Conventions
 
-言語非依存の規約は `docs/conventions/` 配下に置く。各ドキュメントを Source of Truth として扱い、規約と Node / Rust 実装の同期方針は各規約ドキュメント側に記載する。
+Language-agnostic conventions live under `docs/conventions/`. Each document is the source of truth; how it stays in sync with the Node and Rust implementations is described in the document itself.
 
-- [Observability conventions](./docs/conventions/observability.md): OTel + Sentry の構成、環境変数、redact、起動 / shutdown 順序
+- [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order
