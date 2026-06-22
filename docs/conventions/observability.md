@@ -11,7 +11,7 @@
 - Sentry 側に span を二重送信しないこと。具体的には `SentrySpanProcessor` および `SentrySampler` は組み込まない
 - Sentry SDK は trace context の伝播のためにのみ OpenTelemetry に接続する (`SentryPropagator` / `SentryContextManager` を OTel SDK に組み込む)
 
-この分離により、span は Grafana 側でフルに保持しつつ、Sentry の event quota は error にだけ消費される。
+これにより Sentry の event quota は error event だけが消費する。
 
 ## 環境変数
 
@@ -50,7 +50,7 @@ secret store 上のキーは `/infra/<service>/<resource>` 形式で配置する
   - `/_API_KEY$/i` (例: `OPENAI_API_KEY`)
 - HTTP ヘッダ名 `Authorization` (case-insensitive) は値を redact する
 
-redact 後の値は固定文字列 `[REDACTED]` に置き換える。pattern 追加は service 側から options で拡張できる (Node の `extraSecretKeyPatterns` 等。後述)。
+redact 後の値は固定文字列 `[REDACTED]` に置き換える。pattern 追加は service 側から options で拡張できる。
 
 ## Resource attribute
 
