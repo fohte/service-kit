@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# Bootstrap the development environment.
+#
+# Usage:
+#   scripts/bootstrap
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+# Install tool versions managed by mise
+if command -v mise > /dev/null 2>&1; then
+  mise install
+fi
+
+# Enable corepack so that pnpm version from package.json packageManager field is used
+corepack enable
+
+# Use --frozen-lockfile when a lockfile exists so a Renovate-bumped dep still
+# inside the pnpm-workspace.yaml minimumReleaseAge window does not re-trigger
+# the supply-chain policy check and block bootstrap. Fall back to plain
+# `pnpm install` on freshly generated projects without a lockfile yet.
+pnpm_install() {
+  if [ -f pnpm-lock.yaml ]; then
+    pnpm install --frozen-lockfile
+  else
+    pnpm install
+  fi
+}
+
+# Install git hooks via lefthook (hooks live in the common .git/hooks, shared across worktrees)
+if command -v lefthook > /dev/null 2>&1; then
+  lefthook install
+fi
+
+# prettier and commitlint live in mise (see .mise.toml); install each
+# node subpackage's dependencies separately.
+(cd node && pnpm_install)
+
+# Fetch Rust dependencies
+cargo fetch --manifest-path rust/Cargo.toml
