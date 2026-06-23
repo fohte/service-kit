@@ -33,10 +33,10 @@ All `OTEL_*` variables follow the OpenTelemetry standard ([OpenTelemetry Environ
 
 The library's default redactor masks sensitive values in logs, span attributes, and Sentry events by the following rules.
 
-- Mask the value when the key name matches one of the following case-insensitive regexes:
-  - `/_TOKEN$/i` (e.g. `SLACK_BOT_TOKEN`, `github_token`)
-  - `/_DSN$/i` (e.g. `SENTRY_DSN`, `database_dsn`)
-  - `/_API_KEY$/i` (e.g. `OPENAI_API_KEY`)
+- Mask the value when the key name matches one of the following case-insensitive regexes. Each pattern anchors on a word boundary so a bare key like `token` or `dsn` matches too:
+  - `/(?:^|_)TOKEN$/i` (e.g. `token`, `SLACK_BOT_TOKEN`, `github_token`)
+  - `/(?:^|_)DSN$/i` (e.g. `dsn`, `SENTRY_DSN`, `database_dsn`)
+  - `/(?:^|_)API_KEY$/i` (e.g. `api_key`, `OPENAI_API_KEY`)
 - Mask the value of the HTTP header `Authorization` (case-insensitive).
 
 The masked value is replaced by the literal `[REDACTED]`. Services can extend the patterns through options.
@@ -76,7 +76,7 @@ await Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])
 - Be idempotent: a duplicate SIGTERM must return safely as a no-op (guard with an `alreadyShuttingDown` flag).
 - Pass a sensible timeout (e.g. 5 seconds) to each SDK so shutdown cannot hang indefinitely.
 
-The Rust side does the same with `tokio::join!`, flushing the OTel exporter and dropping / flushing Sentry's `ClientInitGuard` in parallel.
+On the Rust side, `Drop` is synchronous (Rust has no async `Drop`), so Sentry's `ClientInitGuard` cannot be flushed inside `tokio::join!`. Await the OTel exporter's async flush first, then drop the guard (either by letting it leave scope or by calling `drop(guard)` explicitly) so its blocking flush runs last.
 
 ## Node
 
@@ -105,13 +105,13 @@ process.on('SIGINT', () => observability.shutdown())
 
 ### Options
 
-| Option                   | Type                                            | Purpose                                                                                                               |
-| ------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (`/_TOKEN$/i`, `/_DSN$/i`, `/_API_KEY$/i`, `Authorization`). |
-| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters.                                         |
-| `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                                                               |
-| `extraInstrumentations`  | `Instrumentation[]`                             | Additional auto-instrumentations.                                                                                     |
-| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).                                                   |
+| Option                   | Type                                            | Purpose                                                                       |
+| ------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------- | -------------------- | ------------------ | --------------------------------- |
+| `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (`/(?:^              | \_)TOKEN$/i`, `/(?:^ | \_)DSN$/i`, `/(?:^ | \_)API_KEY$/i`, `Authorization`). |
+| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters. |
+| `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                       |
+| `extraInstrumentations`  | `Instrumentation[]`                             | Additional auto-instrumentations.                                             |
+| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).           |
 
 A service-specific rule such as "truncate the body of a chat message to 200 characters" is expressible through options alone, without modifying the library:
 
