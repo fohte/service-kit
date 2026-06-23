@@ -78,7 +78,10 @@ export const redactEvent = <T extends object>(
     ...(options.extraSecretKeyPatterns ?? []),
   ]
   const truncators = options.extraStringTruncators ?? []
-  const visited = new WeakMap<object, Record<string, unknown>>()
+  const visited: VisitedCaches = {
+    records: new WeakMap<Record<string, unknown>, Record<string, unknown>>(),
+    arrays: new WeakMap<readonly unknown[], unknown[]>(),
+  }
   const cloned: T = Object.assign({}, event)
 
   for (const field of [
@@ -154,20 +157,44 @@ export const captureWithFingerprint = (
   })
 }
 
+interface VisitedCaches {
+  readonly records: WeakMap<Record<string, unknown>, Record<string, unknown>>
+  readonly arrays: WeakMap<readonly unknown[], unknown[]>
+}
+
 const redactContainer = (
   container: Record<string, unknown>,
   secretPatterns: ReadonlyArray<RegExp>,
   truncators: ReadonlyArray<StringTruncator>,
-  visited: WeakMap<object, Record<string, unknown>>,
+  visited: VisitedCaches,
 ): Record<string, unknown> => {
-  const cached = visited.get(container)
-  if (cached) return cached
+  const cached = visited.records.get(container)
+  if (cached !== undefined) return cached
 
   const next: Record<string, unknown> = {}
-  visited.set(container, next)
+  visited.records.set(container, next)
 
   for (const [key, value] of Object.entries(container)) {
     next[key] = redactValue(key, value, secretPatterns, truncators, visited)
+  }
+  return next
+}
+
+const redactArray = (
+  key: string,
+  array: readonly unknown[],
+  secretPatterns: ReadonlyArray<RegExp>,
+  truncators: ReadonlyArray<StringTruncator>,
+  visited: VisitedCaches,
+): unknown[] => {
+  const cached = visited.arrays.get(array)
+  if (cached !== undefined) return cached
+
+  const next: unknown[] = []
+  visited.arrays.set(array, next)
+
+  for (const entry of array) {
+    next.push(redactValue(key, entry, secretPatterns, truncators, visited))
   }
   return next
 }
@@ -177,7 +204,7 @@ const redactValue = (
   value: unknown,
   secretPatterns: ReadonlyArray<RegExp>,
   truncators: ReadonlyArray<StringTruncator>,
-  visited: WeakMap<object, Record<string, unknown>>,
+  visited: VisitedCaches,
 ): unknown => {
   if (secretPatterns.some((pattern) => pattern.test(key))) return REDACTED
   if (typeof value === 'string') {
@@ -189,9 +216,7 @@ const redactValue = (
     }
   }
   if (Array.isArray(value)) {
-    return value.map((entry) =>
-      redactValue(key, entry, secretPatterns, truncators, visited),
-    )
+    return redactArray(key, value, secretPatterns, truncators, visited)
   }
   if (isRecord(value)) {
     return redactContainer(value, secretPatterns, truncators, visited)

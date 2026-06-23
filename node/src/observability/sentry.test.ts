@@ -267,6 +267,33 @@ describe('redactEvent', () => {
     })
   })
 
+  it('handles circular references in both objects and arrays without overflowing the stack', () => {
+    const sharedArray: unknown[] = ['leaf']
+    sharedArray.push(sharedArray)
+    const sharedObject: Record<string, unknown> = { id: 'O1' }
+    sharedObject['self'] = sharedObject
+    const input = {
+      extra: {
+        loopArray: sharedArray,
+        loopObject: sharedObject,
+      },
+    }
+
+    const result = redactEvent(input)
+
+    expect({
+      arrayHead: result.extra.loopArray[0],
+      arrayCycles: result.extra.loopArray[1] === result.extra.loopArray,
+      objectId: result.extra.loopObject['id'],
+      objectCycles: result.extra.loopObject['self'] === result.extra.loopObject,
+    }).toEqual({
+      arrayHead: 'leaf',
+      arrayCycles: true,
+      objectId: 'O1',
+      objectCycles: true,
+    })
+  })
+
   it('does not mutate the input event', () => {
     const input = {
       request: { headers: { Authorization: 'Bearer x' } },
