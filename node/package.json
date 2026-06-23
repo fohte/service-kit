@@ -1,9 +1,32 @@
 {
-  "name": "node",
-  "private": true,
+  "name": "@fohte/service-kit",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Service bootstrap kit for Node.js: observability and other cross-cutting concerns shared across services.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fohte/service-kit.git",
+    "directory": "node"
+  },
   "packageManager": "pnpm@11.5.2",
   "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    "./observability": {
+      "types": "./dist/observability/index.d.ts",
+      "import": "./dist/observability/index.js",
+      "require": "./dist/observability/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
+    "build": "conc -m 1 pnpm:build:js pnpm:build:dts",
+    "build:js": "tsup",
+    "build:dts": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "format:eslint": "eslint --fix .",
     "format:prettier": "prettier --write .",
@@ -11,6 +34,42 @@
     "test": "conc pnpm:test:type pnpm:test:unit",
     "test:type": "tsc --noEmit",
     "test:unit": "vitest run"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-node": "^0.219.0",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
+    "@sentry/node": "^10.57.0",
+    "@sentry/opentelemetry": "^10.58.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    },
+    "@opentelemetry/auto-instrumentations-node": {
+      "optional": true
+    },
+    "@opentelemetry/exporter-trace-otlp-proto": {
+      "optional": true
+    },
+    "@opentelemetry/resources": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-node": {
+      "optional": true
+    },
+    "@opentelemetry/semantic-conventions": {
+      "optional": true
+    },
+    "@sentry/node": {
+      "optional": true
+    },
+    "@sentry/opentelemetry": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@commitlint/cli": "21.0.2",
@@ -22,6 +81,7 @@
     "concurrently": "10.0.3",
     "eslint": "10.4.1",
     "prettier": "3.8.3",
+    "tsup": "8.5.0",
     "typescript": "6.0.3",
     "vitest": "4.1.8"
   }
