@@ -38,6 +38,7 @@
     "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
     "@opentelemetry/resources": "^2.8.0",
     "@opentelemetry/sdk-node": "^0.219.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
     "@sentry/node": "^10.57.0",
     "@sentry/opentelemetry": "^10.58.0"
@@ -56,6 +57,9 @@
       "optional": true
     },
     "@opentelemetry/sdk-node": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-trace-base": {
       "optional": true
     },
     "@opentelemetry/semantic-conventions": {
@@ -77,6 +81,7 @@
     "@opentelemetry/exporter-trace-otlp-proto": "0.219.0",
     "@opentelemetry/resources": "2.8.0",
     "@opentelemetry/sdk-node": "0.219.0",
+    "@opentelemetry/sdk-trace-base": "2.8.0",
     "@opentelemetry/semantic-conventions": "1.41.1",
     "@sentry/node": "10.58.0",
     "@sentry/opentelemetry": "10.58.0",
