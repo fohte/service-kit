@@ -54,10 +54,11 @@ export const initSentry = (
   env: SentryEnv,
   options: InitSentryOptions = {},
 ): NodeClient | undefined => {
-  if (!isSentryConfigured(env)) return undefined
+  const dsn = env.SENTRY_DSN?.trim() ?? ''
+  if (dsn.length === 0) return undefined
   const { extraIgnoreErrors, sentryOptions, ...redactOptions } = options
   return Sentry.init({
-    dsn: env.SENTRY_DSN,
+    dsn,
     environment: env.SENTRY_ENVIRONMENT,
     release: env.SENTRY_RELEASE,
     skipOpenTelemetrySetup: true,
@@ -80,17 +81,13 @@ export const redactEvent = <T extends object>(
   const visited = new WeakMap<object, Record<string, unknown>>()
   const cloned: T = Object.assign({}, event)
 
-  const request: unknown = Reflect.get(cloned, 'request')
-  if (isRecord(request)) {
-    const headers: unknown = Reflect.get(request, 'headers')
-    if (isRecord(headers)) {
-      Reflect.set(cloned, 'request', {
-        ...request,
-        headers: redactContainer(headers, secretPatterns, truncators, visited),
-      })
-    }
-  }
-  for (const field of ['contexts', 'extra', 'tags', 'user'] as const) {
+  for (const field of [
+    'request',
+    'contexts',
+    'extra',
+    'tags',
+    'user',
+  ] as const) {
     const value: unknown = Reflect.get(cloned, field)
     if (isRecord(value)) {
       Reflect.set(

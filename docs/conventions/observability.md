@@ -84,7 +84,7 @@ On the Rust side, `Drop` is synchronous (Rust has no async `Drop`), so Sentry's 
 
 ### API
 
-`@fohte/service-kit/observability` exports a single entry point, `initObservability`.
+`@fohte/service-kit/observability` exports `initObservability` as the entry point integrators are expected to call, plus the low-level building blocks (`createNodeSdk`, `initSentry`, `redactEvent`, `captureWithFingerprint`) used to assemble it.
 
 ```ts
 import { initObservability } from '@fohte/service-kit/observability'
