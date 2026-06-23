@@ -105,13 +105,13 @@ process.on('SIGINT', () => observability.shutdown())
 
 ### Options
 
-| Option                   | Type                                            | Purpose                                                                       |
-| ------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------- | -------------------- | ------------------ | --------------------------------- |
-| `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (`/(?:^              | \_)TOKEN$/i`, `/(?:^ | \_)DSN$/i`, `/(?:^ | \_)API_KEY$/i`, `Authorization`). |
-| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters. |
-| `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                       |
-| `extraInstrumentations`  | `Instrumentation[]`                             | Additional auto-instrumentations.                                             |
-| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).           |
+| Option                   | Type                                            | Purpose                                                                               |
+| ------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (see Redact patterns above). |
+| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters.         |
+| `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                               |
+| `extraInstrumentations`  | `Instrumentation[]`                             | Additional auto-instrumentations.                                                     |
+| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).                   |
 
 A service-specific rule such as "truncate the body of a chat message to 200 characters" is expressible through options alone, without modifying the library:
 
