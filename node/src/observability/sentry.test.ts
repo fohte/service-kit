@@ -72,8 +72,20 @@ describe('isSentryConfigured', () => {
 })
 
 describe('initSentry', () => {
-  it('returns undefined when SENTRY_DSN is missing', () => {
-    expect(initSentry({})).toBeUndefined()
+  it('throws when SENTRY_DSN is missing or blank', () => {
+    expect(() => initSentry({})).toThrow(/SENTRY_DSN is required/)
+    expect(() => initSentry({ SENTRY_DSN: '   ' })).toThrow(
+      /SENTRY_DSN is required/,
+    )
+  })
+
+  it('throws when SENTRY_ENVIRONMENT is missing or blank', () => {
+    expect(() => initSentry({ SENTRY_DSN: 'https://x@y/1' })).toThrow(
+      /SENTRY_ENVIRONMENT is required/,
+    )
+    expect(() =>
+      initSentry({ SENTRY_DSN: 'https://x@y/1', SENTRY_ENVIRONMENT: '   ' }),
+    ).toThrow(/SENTRY_ENVIRONMENT is required/)
   })
 })
 

@@ -56,26 +56,25 @@ const parseKeyValueList = (raw: string | undefined): Record<string, string> => {
   return out
 }
 
-const buildResourceAttributes = (
+const resolveServiceName = (
   env: OtelEnv,
+  extraAttributes: Record<string, string>,
   defaultServiceName: string | undefined,
-): Record<string, string> => {
-  const extra = parseKeyValueList(env.OTEL_RESOURCE_ATTRIBUTES)
+): string => {
   const explicit = env.OTEL_SERVICE_NAME?.trim() ?? ''
-  const fromAttrs = extra[ATTR_SERVICE_NAME] ?? ''
-  const fallback = defaultServiceName?.trim() ?? ''
-  const serviceName =
-    explicit.length > 0 ? explicit : fromAttrs.length > 0 ? fromAttrs : fallback
-  return serviceName.length > 0
-    ? { ...extra, [ATTR_SERVICE_NAME]: serviceName }
-    : { ...extra }
+  if (explicit.length > 0) return explicit
+  const fromAttrs = extraAttributes[ATTR_SERVICE_NAME] ?? ''
+  if (fromAttrs.length > 0) return fromAttrs
+  return defaultServiceName?.trim() ?? ''
 }
 
-const buildResource = (
-  env: OtelEnv,
-  defaultServiceName: string | undefined,
-): Resource =>
-  resourceFromAttributes(buildResourceAttributes(env, defaultServiceName))
+const buildResource = (env: OtelEnv, serviceName: string): Resource => {
+  const extra = parseKeyValueList(env.OTEL_RESOURCE_ATTRIBUTES)
+  return resourceFromAttributes({
+    ...extra,
+    [ATTR_SERVICE_NAME]: serviceName,
+  })
+}
 
 const createOtlpTraceExporter = (env: OtelEnv): OTLPTraceExporter => {
   const endpoint = readEndpoint(env)
@@ -95,8 +94,25 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     propagator,
     contextManager,
   } = options
+  const endpoint = readEndpoint(env)
+  if (endpoint.length === 0) {
+    throw new Error(
+      'OTEL_EXPORTER_OTLP_ENDPOINT is required to build the OpenTelemetry SDK. Provide a dummy endpoint in development if you do not have an OTLP collector configured.',
+    )
+  }
+  const extraAttributes = parseKeyValueList(env.OTEL_RESOURCE_ATTRIBUTES)
+  const serviceName = resolveServiceName(
+    env,
+    extraAttributes,
+    defaultServiceName,
+  )
+  if (serviceName.length === 0) {
+    throw new Error(
+      'OTEL_SERVICE_NAME (or `service.name` in OTEL_RESOURCE_ATTRIBUTES, or the `defaultServiceName` option) is required to build the OpenTelemetry SDK.',
+    )
+  }
   const traceExporter = createOtlpTraceExporter(env)
-  const resource = buildResource(env, defaultServiceName)
+  const resource = buildResource(env, serviceName)
   const instrumentations = getNodeAutoInstrumentations()
   // NodeSDK's `spanProcessors` option replaces the default
   // BatchSpanProcessor(traceExporter) instead of appending to it, so prepend

@@ -53,19 +53,35 @@ export const isSentryConfigured = (env: SentryEnv): boolean => {
 export const initSentry = (
   env: SentryEnv,
   options: InitSentryOptions = {},
-): NodeClient | undefined => {
+): NodeClient => {
   const dsn = env.SENTRY_DSN?.trim() ?? ''
-  if (dsn.length === 0) return undefined
+  if (dsn.length === 0) {
+    throw new Error(
+      'SENTRY_DSN is required to initialize Sentry. Provide a dummy value in development if you intentionally do not want to ship events.',
+    )
+  }
+  const environment = env.SENTRY_ENVIRONMENT?.trim() ?? ''
+  if (environment.length === 0) {
+    throw new Error(
+      'SENTRY_ENVIRONMENT is required to initialize Sentry. Provide a dummy value in development if you intentionally do not want to ship events.',
+    )
+  }
   const { extraIgnoreErrors, sentryOptions, ...redactOptions } = options
-  return Sentry.init({
+  const client = Sentry.init({
     dsn,
-    environment: env.SENTRY_ENVIRONMENT,
+    environment,
     release: env.SENTRY_RELEASE,
     skipOpenTelemetrySetup: true,
     beforeSend: (event: ErrorEvent) => redactEvent(event, redactOptions),
     ignoreErrors: [...NOISE_PATTERNS, ...(extraIgnoreErrors ?? [])],
     ...sentryOptions,
   })
+  if (client === undefined) {
+    throw new Error(
+      'Sentry.init returned no client; check the SDK options for invalid values.',
+    )
+  }
+  return client
 }
 
 export const redactEvent = <T extends object>(
