@@ -1,5 +1,7 @@
 # Observability conventions
 
+Audience: implementers of the kit, and operators who integrate it into a service.
+
 Conventions for the observability layer shared by `@fohte/service-kit` (Node) and `fohte-service-kit` (Rust crate). Treat this document as the source of truth: when the Node or Rust implementation changes, update both implementations and this document in the same PR.
 
 ## Design policy

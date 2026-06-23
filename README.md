@@ -1,6 +1,10 @@
 # service-kit
 
-@fohte's personal cross-language service bootstrap kit (@fohte/service-kit for Node, fohte-service-kit crate for Rust)
+@fohte's personal cross-language service bootstrap kit, intended to ship as the `@fohte/service-kit` npm package (Node) and the `fohte-service-kit` crate (Rust).
+
+## Status
+
+Pre-release. No library code is published yet; this repository currently ships only the cross-language conventions under `docs/conventions/`. Install and usage instructions will be added once the first release lands.
 
 ## Conventions
 
