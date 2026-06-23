@@ -18,15 +18,12 @@
   "exports": {
     "./observability": {
       "types": "./dist/observability/index.d.ts",
-      "import": "./dist/observability/index.js",
-      "require": "./dist/observability/index.cjs"
+      "import": "./dist/observability/index.js"
     },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "pnpm build:js && pnpm build:dts",
-    "build:js": "tsup",
-    "build:dts": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "format:eslint": "eslint --fix .",
     "format:prettier": "prettier --write .",
@@ -89,7 +86,6 @@
     "concurrently": "10.0.3",
     "eslint": "10.4.1",
     "prettier": "3.8.3",
-    "tsup": "8.5.0",
     "typescript": "6.0.3",
     "vitest": "4.1.8"
   }
