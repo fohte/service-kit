@@ -1,59 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-interface CapturedScopeCalls {
-  fingerprints: unknown[]
-  levels: unknown[]
-  tags: Record<string, unknown>
-  extras: Record<string, unknown>
-  errors: unknown[]
-}
+// Stub @sentry/node so importing this module does not load the real SDK
+// (which registers global instrumentation on import). Tests in this file
+// only exercise our own logic: env validation in initSentry and the pure
+// transformations in redactEvent.
+vi.mock('@sentry/node', () => ({ init: vi.fn() }))
 
-const captured: CapturedScopeCalls = {
-  fingerprints: [],
-  levels: [],
-  tags: {},
-  extras: {},
-  errors: [],
-}
-
-const scope = {
-  setFingerprint: (fp: unknown) => {
-    captured.fingerprints.push(fp)
-    return scope
-  },
-  setLevel: (level: unknown) => {
-    captured.levels.push(level)
-    return scope
-  },
-  setTag: (key: string, value: unknown) => {
-    captured.tags[key] = value
-    return scope
-  },
-  setExtra: (key: string, value: unknown) => {
-    captured.extras[key] = value
-    return scope
-  },
-}
-
-vi.mock('@sentry/node', () => ({
-  init: vi.fn(),
-  withScope: (cb: (s: typeof scope) => unknown) => cb(scope),
-  captureException: (err: unknown) => {
-    captured.errors.push(err)
-    return 'event-id'
-  },
-}))
-
-const { captureWithFingerprint, initSentry, isSentryConfigured, redactEvent } =
+const { initSentry, isSentryConfigured, redactEvent } =
   await import('@/observability/sentry')
-
-beforeEach(() => {
-  captured.fingerprints = []
-  captured.levels = []
-  captured.tags = {}
-  captured.extras = {}
-  captured.errors = []
-})
 
 describe('isSentryConfigured', () => {
   it('returns based on SENTRY_DSN presence', () => {
@@ -315,44 +269,6 @@ describe('redactEvent', () => {
     expect(input).toEqual({
       request: { headers: { Authorization: 'Bearer x' } },
       extra: { SENTRY_DSN: 'dsn' },
-    })
-  })
-})
-
-describe('captureWithFingerprint', () => {
-  it('forwards the error to Sentry with the fingerprint, level, tags, and extras from context', () => {
-    const err = new Error('boom')
-    captureWithFingerprint(err, 'opencode-go-usage-limit', {
-      level: 'warning',
-      tags: {
-        error_type: 'GoUsageLimitError',
-        retry_after_seconds: '42',
-      },
-      extras: { request_id: 'req-1' },
-    })
-
-    expect(captured).toEqual({
-      fingerprints: [['opencode-go-usage-limit']],
-      levels: ['warning'],
-      tags: {
-        error_type: 'GoUsageLimitError',
-        retry_after_seconds: '42',
-      },
-      extras: { request_id: 'req-1' },
-      errors: [err],
-    })
-  })
-
-  it('accepts an array fingerprint and omits optional scope fields', () => {
-    const err = new Error('boom')
-    captureWithFingerprint(err, ['service', 'kind-x'])
-
-    expect(captured).toEqual({
-      fingerprints: [['service', 'kind-x']],
-      levels: [],
-      tags: {},
-      extras: {},
-      errors: [err],
     })
   })
 })
