@@ -7,7 +7,16 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
+      '@commitlint/cli':
+        specifier: 21.0.2
+        version: 21.0.2(@types/node@24.13.1)(conventional-commits-parser@6.4.0)(typescript@6.0.3)
+      '@eslint/eslintrc':
+        specifier: 3.3.5
+        version: 3.3.5
+      '@fohte/eslint-config':
+        specifier: 0.3.4
+        version: 0.3.4(abc15bdada38db5a5b101103cdb04bd4)
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -32,16 +41,6 @@ importers:
       '@sentry/opentelemetry':
         specifier: ^10.58.0
         version: 10.58.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.41.1)
-    devDependencies:
-      '@commitlint/cli':
-        specifier: 21.0.2
-        version: 21.0.2(@types/node@24.13.1)(conventional-commits-parser@6.4.0)(typescript@6.0.3)
-      '@eslint/eslintrc':
-        specifier: 3.3.5
-        version: 3.3.5
-      '@fohte/eslint-config':
-        specifier: 0.3.4
-        version: 0.3.4(abc15bdada38db5a5b101103cdb04bd4)
       '@tsconfig/node-lts':
         specifier: 24.0.0
         version: 24.0.0
