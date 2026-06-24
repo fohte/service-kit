@@ -15,6 +15,8 @@
     { "type": "ci", "hidden": true }
   ],
   "include-component-in-tag": true,
+  "separate-pull-requests": true,
+  "pull-request-title-pattern": "chore${scope}: release ${component} ${version}",
   "packages": {
     "node": {
       "release-type": "node",
