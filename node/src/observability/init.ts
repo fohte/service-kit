@@ -42,6 +42,11 @@ const noopLogger: ObservabilityLogger = {
 
 const noopHandle: ObservabilityHandle = { shutdown: async () => {} }
 
+// `initObservability` installs SIGTERM/SIGINT once for the process lifetime —
+// a repeated call (e.g. in tests or a hot-reload loop) must not stack a second
+// pair of listeners that would each re-deliver the signal.
+let signalsInstalled = false
+
 const flushAndLog = (
   otelSdk: { shutdown(): Promise<unknown> } | undefined,
   sentryStarted: boolean,
@@ -96,10 +101,10 @@ export const initObservability = (
         ...(defaultServiceName !== undefined ? { defaultServiceName } : {}),
         ...(sampler ? { sampler } : {}),
         ...(extraSpanProcessors ? { spanProcessors: extraSpanProcessors } : {}),
-        // Sentry's autocapture inherits the trace_id from the active OTel span
-        // when we hand OTel Sentry's propagator and context manager. Skip the
-        // wiring entirely when Sentry is not enabled so the OTel SDK falls
-        // back to the default W3C propagator and async-hooks context manager.
+        // Fall back to the OTel defaults (W3C propagator + async-hooks
+        // context manager) when Sentry is disabled — handing OTel a
+        // `SentryPropagator` / `SentryContextManager` without a live Sentry
+        // hub would attach them to nothing and lose trace context entirely.
         ...(sentryStarted
           ? {
               propagator: new SentryPropagator(),
@@ -135,17 +140,19 @@ export const initObservability = (
       return shutdownPromise
     }
 
-    // Registering a custom listener for SIGTERM/SIGINT suppresses Node's
-    // default termination, so re-send the signal after shutdown completes —
-    // the `once` listener has already removed itself, so the second delivery
-    // triggers the default behavior.
-    const onSignal = (signal: NodeJS.Signals): void => {
-      void shutdown().then(() => {
-        process.kill(process.pid, signal)
-      })
+    if (!signalsInstalled) {
+      // Re-send the signal after shutdown so Node's default termination
+      // still runs. `finally` (not `then`) so a throwing logger inside
+      // `flushAndLog` still lets the signal reach the default handler.
+      const onSignal = (signal: NodeJS.Signals): void => {
+        void shutdown().finally(() => {
+          process.kill(process.pid, signal)
+        })
+      }
+      process.once('SIGTERM', onSignal)
+      process.once('SIGINT', onSignal)
+      signalsInstalled = true
     }
-    process.once('SIGTERM', onSignal)
-    process.once('SIGINT', onSignal)
 
     return { shutdown }
   } catch (err) {
@@ -156,15 +163,23 @@ export const initObservability = (
       },
       'failed to initialize observability',
     )
-    // Hold the cleanup promise on the returned handle so the caller can still
-    // `await handle.shutdown()` to wait for the in-flight flush before exit,
-    // instead of losing the very telemetry that exposed the init failure.
-    const cleanup = flushAndLog(
-      otelSdk,
-      sentryStarted,
-      shutdownTimeoutMs,
-      logger,
-    )
-    return { shutdown: () => cleanup }
+    // Lazy cleanup: defer the flush until the caller actually invokes
+    // `shutdown()`. Kicking off Promise.allSettled here would either run
+    // unobserved (silent telemetry loss) or surface as an unhandled
+    // rejection if the caller exits without awaiting the handle.
+    let lazyCleanup: Promise<void> | undefined
+    return {
+      shutdown: () => {
+        if (!lazyCleanup) {
+          lazyCleanup = flushAndLog(
+            otelSdk,
+            sentryStarted,
+            shutdownTimeoutMs,
+            logger,
+          )
+        }
+        return lazyCleanup
+      },
+    }
   }
 }

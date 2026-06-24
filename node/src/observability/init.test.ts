@@ -27,13 +27,12 @@ const {
   },
   sdkStart: vi.fn<() => void>(),
   sdkShutdown: vi.fn<() => Promise<void>>(),
-  createNodeSdkMock:
-    vi.fn<
-      (options: OtelOptions) => {
-        start: () => void
-        shutdown: () => Promise<void>
-      }
-    >(),
+  createNodeSdkMock: vi.fn<
+    (options: OtelOptions) => {
+      start: () => void
+      shutdown: () => Promise<void>
+    }
+  >(),
 }))
 
 vi.mock('@sentry/node', () => ({
@@ -102,32 +101,24 @@ describe('initObservability', () => {
     const handle = initObservability(FULL_ENV, { logger })
 
     const sdkOptions = createNodeSdkMock.mock.calls[0]?.[0]
-    // Normalize the raw invocationCallOrder values (which jitter with the
-    // shared vitest counter) to a dense rank so the call sequence is a stable
-    // literal: rank 1 = first call, 2 = next call, etc.
-    const rankCallOrder = (mock: { invocationCallOrder: number[] }): number => {
-      const order = [
-        sentryInit.mock.invocationCallOrder[0] ?? -1,
-        createNodeSdkMock.mock.invocationCallOrder[0] ?? -1,
-        sdkStart.mock.invocationCallOrder[0] ?? -1,
-        sentryValidate.mock.invocationCallOrder[0] ?? -1,
-      ]
-        .filter((n) => n > 0)
-        .sort((a, b) => a - b)
-      const self = mock.invocationCallOrder[0] ?? -1
-      return order.indexOf(self) + 1
-    }
+    const entries: Array<[string, number | undefined]> = [
+      ['sentryInit', sentryInit.mock.invocationCallOrder[0]],
+      ['createNodeSdk', createNodeSdkMock.mock.invocationCallOrder[0]],
+      ['sdkStart', sdkStart.mock.invocationCallOrder[0]],
+      ['sentryValidate', sentryValidate.mock.invocationCallOrder[0]],
+    ]
+    const callOrder: string[] = entries
+      .filter(
+        (entry): entry is [string, number] => typeof entry[1] === 'number',
+      )
+      .sort((a, b) => a[1] - b[1])
+      .map(([name]) => name)
     expect({
       sentryInitCount: sentryInit.mock.calls.length,
       createNodeSdkCount: createNodeSdkMock.mock.calls.length,
       sdkStartCount: sdkStart.mock.calls.length,
       validateCount: sentryValidate.mock.calls.length,
-      callOrder: {
-        sentryInit: rankCallOrder(sentryInit.mock),
-        createNodeSdk: rankCallOrder(createNodeSdkMock.mock),
-        sdkStart: rankCallOrder(sdkStart.mock),
-        sentryValidate: rankCallOrder(sentryValidate.mock),
-      },
+      callOrder,
       propagator: sdkOptions?.propagator instanceof FakeSentryPropagator,
       contextManager:
         sdkOptions?.contextManager instanceof FakeSentryContextManager,
@@ -139,12 +130,7 @@ describe('initObservability', () => {
       createNodeSdkCount: 1,
       sdkStartCount: 1,
       validateCount: 1,
-      callOrder: {
-        sentryInit: 1,
-        createNodeSdk: 2,
-        sdkStart: 3,
-        sentryValidate: 4,
-      },
+      callOrder: ['sentryInit', 'createNodeSdk', 'sdkStart', 'sentryValidate'],
       propagator: true,
       contextManager: true,
       hasShutdown: true,
