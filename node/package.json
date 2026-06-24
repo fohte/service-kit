@@ -1,5 +1,4 @@
 {
-<<<<<<< before updating
   "name": "@fohte/service-kit",
   "version": "0.0.0",
   "private": false,
@@ -14,12 +13,7 @@
     "url": "https://github.com/fohte/service-kit.git",
     "directory": "node"
   },
-  "packageManager": "pnpm@11.5.2",
-=======
-  "name": "node",
-  "private": true,
   "packageManager": "pnpm@11.7.0",
->>>>>>> after updating
   "type": "module",
   "files": [
     "dist",
