@@ -10,3 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Skip tests for release-please PR (only updates CHANGELOG and version)"
+
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Skip unit tests for release-please PR (only updates CHANGELOG and version)"

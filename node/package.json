@@ -1,4 +1,5 @@
 {
+<<<<<<< before updating
   "name": "@fohte/service-kit",
   "version": "0.0.0",
   "private": false,
@@ -14,6 +15,11 @@
     "directory": "node"
   },
   "packageManager": "pnpm@11.5.2",
+=======
+  "name": "node",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+>>>>>>> after updating
   "type": "module",
   "files": [
     "dist",
@@ -91,11 +97,11 @@
     "@sentry/opentelemetry": "10.58.0",
     "@tsconfig/node-lts": "24.0.0",
     "@tsconfig/strictest": "2.0.8",
-    "@types/node": "24.13.1",
+    "@types/node": "24.13.2",
     "concurrently": "10.0.3",
-    "eslint": "10.4.1",
-    "prettier": "3.8.3",
+    "eslint": "10.5.0",
+    "prettier": "3.8.4",
     "typescript": "6.0.3",
-    "vitest": "4.1.8"
+    "vitest": "4.1.9"
   }
 }
