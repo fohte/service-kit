@@ -1,4 +1,12 @@
 export {
+  initObservability,
+  type InitObservabilityOptions,
+  isObservabilityConfigured,
+  type ObservabilityEnv,
+  type ObservabilityHandle,
+  type ObservabilityLogger,
+} from '@/observability/init'
+export {
   createNodeSdk,
   isOtelConfigured,
   type OtelEnv,

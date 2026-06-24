@@ -92,28 +92,35 @@ import { initObservability } from '@fohte/service-kit/observability'
 const observability = initObservability(process.env, {
   // optional extensions
 })
-
-process.on('SIGTERM', () => observability.shutdown())
-process.on('SIGINT', () => observability.shutdown())
+// SIGTERM / SIGINT handlers that flush both SDKs and re-deliver the signal
+// are installed by `initObservability` itself — the integrator does not need
+// to wire them. Call `observability.shutdown()` directly for non-signal exits.
 ```
 
 `initObservability(env, options)` does the following:
 
-1. Read `env` and fail fast if any required variable is missing.
-2. Initialize Sentry.
-3. Build `NodeSDK`, register `SentryPropagator` and `SentryContextManager`, and call `start()`.
-4. Call `Sentry.validateOpenTelemetrySetup()`.
-5. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(5000)])`.
+1. Read `env`. Fail fast (throw) if neither Sentry nor OpenTelemetry is configured — provide dummy values in development if telemetry is intentionally disabled. Use `isObservabilityConfigured(env)` to probe the env before calling.
+2. Treat each SDK independently: only Sentry is initialized when just `SENTRY_*` is set, only OTel is started when just `OTEL_*` is set, and both run when both are set.
+3. If Sentry is configured, initialize Sentry first so its global hooks are in place before OTel starts.
+4. If OTel is configured, build `NodeSDK`. When Sentry is also enabled, register `SentryPropagator` and `SentryContextManager`. Call `start()`.
+5. If both SDKs are enabled, call `Sentry.validateOpenTelemetrySetup()` to confirm the wiring.
+6. Register per-instance SIGTERM / SIGINT handlers that flush both SDKs and re-deliver the signal so Node's default termination still runs. The listeners detach themselves on first `shutdown()` call so a subsequent `initObservability` in the same process re-registers fresh handlers.
+7. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])`.
+8. If initialization throws after a partial start, log an `observability_init_failed` warn event, kick off a best-effort flush of whichever SDK had already started, and re-throw so the caller fails fast.
 
 ### Options
 
 | Option                   | Type                                            | Purpose                                                                               |
 | ------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `logger`                 | `{ info(payload, msg); warn(payload, msg) }`    | Logger to record init / shutdown events. Defaults to a no-op.                         |
+| `defaultServiceName`     | `string`                                        | Fallback `service.name` used when neither env var carries one.                        |
 | `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (see Redact patterns above). |
 | `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters.         |
 | `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                               |
-| `extraInstrumentations`  | `Instrumentation[]`                             | Additional auto-instrumentations.                                                     |
+| `sampler`                | `Sampler`                                       | Override the OTel sampler. Defaults to the SDK's standard sampler.                    |
+| `extraIgnoreErrors`      | `Array<string \| RegExp>`                       | Additional `ignoreErrors` patterns forwarded to Sentry on top of the noise defaults.  |
 | `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).                   |
+| `shutdownTimeoutMs`      | `number`                                        | Per-SDK timeout passed to `Sentry.close`. Defaults to 5000 ms.                        |
 
 A service-specific rule such as "truncate the body of a chat message to 200 characters" is expressible through options alone, without modifying the library:
 
