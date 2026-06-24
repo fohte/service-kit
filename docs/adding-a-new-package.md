@@ -1,6 +1,6 @@
 # Adding a new package
 
-This document covers Node packages. The Node side publishes to public npm using [trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) via `.github/workflows/release-please.yml`. npm requires the package to exist before trusted publishing can be configured, so the first publish is a one-time manual step.
+This document covers Node packages. Node packages publish to public npm using [trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) via `.github/workflows/release-please.yml`. npm requires the package to exist before trusted publishing can be configured, so the first publish is a one-time manual step.
 
 ## 1. Add `publishConfig` to `package.json`
 
@@ -58,6 +58,12 @@ On the same access page, switch publishing access to **Require two-factor authen
 
 ## 5. Ship the first real version
 
-Create a release commit on `main` that bumps the manifest entry for the new component to its first real version (for example `0.1.0`) and a matching annotated tag `<component>-v<version>`. The repo's `pr-required` ruleset will block a direct push to `main`, so do this through whatever ruleset-bypass path is available to a repo admin (temporary ruleset disable + GitHub API, or the equivalent helper from your own dotfiles).
+release-please will not open a release PR until at least one existing release tag pins the baseline. Seed it once by:
 
-Once the tag is on `main`, `release-please.yml` picks up the existing release, opens (or updates) a release PR, and merging that PR triggers `publish-node`, which uses OIDC to publish with a provenance attestation.
+1. Disabling the `pr-required` ruleset for `main` in the repo settings (Settings → Rules → Rulesets).
+2. Bumping the component's entry in `.release-please-manifest.json` to the target version (for example `0.1.0`), committing on `main`, and pushing the matching annotated tag (`<component>-v<version>`).
+3. Re-enabling the ruleset.
+
+Once the tag is on `main`, `release-please.yml` picks it up, opens (or updates) a release PR, and merging that PR triggers `publish-node`, which uses OIDC to publish with a provenance attestation.
+
+If `publish-node` fails after the release tag is created (transient npm error, missing trusted publisher configuration, etc.), re-run the failed job from the Actions UI. `pnpm publish` skips versions already on the registry, so partial-success states are safe to retry.
