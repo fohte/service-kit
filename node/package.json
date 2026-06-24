@@ -4,6 +4,10 @@
   "private": false,
   "description": "Service bootstrap kit for Node.js: observability and other cross-cutting concerns shared across services.",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/fohte/service-kit.git",
