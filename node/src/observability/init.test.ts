@@ -100,48 +100,36 @@ describe('initObservability', () => {
     const logger = makeLogger()
     const handle = initObservability(FULL_ENV, { logger })
 
+    expect(sentryInit).toHaveBeenCalledTimes(1)
+    expect(createNodeSdkMock).toHaveBeenCalledTimes(1)
+    expect(sdkStart).toHaveBeenCalledTimes(1)
+    expect(sentryValidate).toHaveBeenCalledTimes(1)
+
     const sdkOptions = createNodeSdkMock.mock.calls[0]?.[0]
-    const entries: Array<[string, number | undefined]> = [
-      ['sentryInit', sentryInit.mock.invocationCallOrder[0]],
-      ['createNodeSdk', createNodeSdkMock.mock.invocationCallOrder[0]],
-      ['sdkStart', sdkStart.mock.invocationCallOrder[0]],
-      ['sentryValidate', sentryValidate.mock.invocationCallOrder[0]],
+    expect(sdkOptions?.propagator).toBeInstanceOf(FakeSentryPropagator)
+    expect(sdkOptions?.contextManager).toBeInstanceOf(FakeSentryContextManager)
+
+    const callOrder = [
+      sentryInit.mock.invocationCallOrder[0],
+      createNodeSdkMock.mock.invocationCallOrder[0],
+      sdkStart.mock.invocationCallOrder[0],
+      sentryValidate.mock.invocationCallOrder[0],
     ]
-    const callOrder: string[] = entries
-      .filter(
-        (entry): entry is [string, number] => typeof entry[1] === 'number',
-      )
-      .sort((a, b) => a[1] - b[1])
-      .map(([name]) => name)
-    expect({
-      sentryInitCount: sentryInit.mock.calls.length,
-      createNodeSdkCount: createNodeSdkMock.mock.calls.length,
-      sdkStartCount: sdkStart.mock.calls.length,
-      validateCount: sentryValidate.mock.calls.length,
+    expect(callOrder.every((n): n is number => typeof n === 'number')).toBe(
+      true,
+    )
+    expect([...callOrder].sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual(
       callOrder,
-      propagator: sdkOptions?.propagator instanceof FakeSentryPropagator,
-      contextManager:
-        sdkOptions?.contextManager instanceof FakeSentryContextManager,
-      hasShutdown: typeof handle.shutdown === 'function',
-      infoCalls: logger.info.mock.calls,
-      warnCalls: logger.warn.mock.calls,
-    }).toEqual({
-      sentryInitCount: 1,
-      createNodeSdkCount: 1,
-      sdkStartCount: 1,
-      validateCount: 1,
-      callOrder: ['sentryInit', 'createNodeSdk', 'sdkStart', 'sentryValidate'],
-      propagator: true,
-      contextManager: true,
-      hasShutdown: true,
-      infoCalls: [
-        [
-          { event: 'observability_initialized', otel: true, sentry: true },
-          'observability initialized',
-        ],
+    )
+
+    expect(handle.shutdown).toBeInstanceOf(Function)
+    expect(logger.info.mock.calls).toEqual([
+      [
+        { event: 'observability_initialized', otel: true, sentry: true },
+        'observability initialized',
       ],
-      warnCalls: [],
-    })
+    ])
+    expect(logger.warn).not.toHaveBeenCalled()
   })
 
   it('initializes Sentry only when OTel is not configured', () => {
@@ -152,28 +140,18 @@ describe('initObservability', () => {
     }
     const handle = initObservability(env, { logger })
 
-    expect({
-      sentryInitCount: sentryInit.mock.calls.length,
-      createNodeSdkCount: createNodeSdkMock.mock.calls.length,
-      sdkStartCount: sdkStart.mock.calls.length,
-      validateCount: sentryValidate.mock.calls.length,
-      hasShutdown: typeof handle.shutdown === 'function',
-      infoCalls: logger.info.mock.calls,
-      warnCalls: logger.warn.mock.calls,
-    }).toEqual({
-      sentryInitCount: 1,
-      createNodeSdkCount: 0,
-      sdkStartCount: 0,
-      validateCount: 0,
-      hasShutdown: true,
-      infoCalls: [
-        [
-          { event: 'observability_initialized', otel: false, sentry: true },
-          'observability initialized',
-        ],
+    expect(sentryInit).toHaveBeenCalledTimes(1)
+    expect(createNodeSdkMock).not.toHaveBeenCalled()
+    expect(sdkStart).not.toHaveBeenCalled()
+    expect(sentryValidate).not.toHaveBeenCalled()
+    expect(handle.shutdown).toBeInstanceOf(Function)
+    expect(logger.info.mock.calls).toEqual([
+      [
+        { event: 'observability_initialized', otel: false, sentry: true },
+        'observability initialized',
       ],
-      warnCalls: [],
-    })
+    ])
+    expect(logger.warn).not.toHaveBeenCalled()
   })
 
   it('initializes OTel only and skips the Sentry self-diagnostic when Sentry is not configured', () => {
@@ -184,33 +162,23 @@ describe('initObservability', () => {
     }
     const handle = initObservability(env, { logger })
 
+    expect(sentryInit).not.toHaveBeenCalled()
+    expect(createNodeSdkMock).toHaveBeenCalledTimes(1)
+    expect(sdkStart).toHaveBeenCalledTimes(1)
+    expect(sentryValidate).not.toHaveBeenCalled()
+
     const sdkOptions = createNodeSdkMock.mock.calls[0]?.[0]
-    expect({
-      sentryInitCount: sentryInit.mock.calls.length,
-      createNodeSdkCount: createNodeSdkMock.mock.calls.length,
-      sdkStartCount: sdkStart.mock.calls.length,
-      validateCount: sentryValidate.mock.calls.length,
-      propagator: sdkOptions?.propagator,
-      contextManager: sdkOptions?.contextManager,
-      hasShutdown: typeof handle.shutdown === 'function',
-      infoCalls: logger.info.mock.calls,
-      warnCalls: logger.warn.mock.calls,
-    }).toEqual({
-      sentryInitCount: 0,
-      createNodeSdkCount: 1,
-      sdkStartCount: 1,
-      validateCount: 0,
-      propagator: undefined,
-      contextManager: undefined,
-      hasShutdown: true,
-      infoCalls: [
-        [
-          { event: 'observability_initialized', otel: true, sentry: false },
-          'observability initialized',
-        ],
+    expect(sdkOptions?.propagator).toBeUndefined()
+    expect(sdkOptions?.contextManager).toBeUndefined()
+
+    expect(handle.shutdown).toBeInstanceOf(Function)
+    expect(logger.info.mock.calls).toEqual([
+      [
+        { event: 'observability_initialized', otel: true, sentry: false },
+        'observability initialized',
       ],
-      warnCalls: [],
-    })
+    ])
+    expect(logger.warn).not.toHaveBeenCalled()
   })
 
   it('returns a no-op handle and logs only the init event when neither is configured', async () => {
@@ -218,47 +186,26 @@ describe('initObservability', () => {
     const handle = initObservability({}, { logger })
     await handle.shutdown()
 
-    expect({
-      sentryInitCount: sentryInit.mock.calls.length,
-      createNodeSdkCount: createNodeSdkMock.mock.calls.length,
-      sdkShutdownCount: sdkShutdown.mock.calls.length,
-      sentryCloseCount: sentryClose.mock.calls.length,
-      infoCalls: logger.info.mock.calls,
-      warnCalls: logger.warn.mock.calls,
-    }).toEqual({
-      sentryInitCount: 0,
-      createNodeSdkCount: 0,
-      sdkShutdownCount: 0,
-      sentryCloseCount: 0,
-      infoCalls: [
-        [
-          { event: 'observability_initialized', otel: false, sentry: false },
-          'observability initialized',
-        ],
+    expect(sentryInit).not.toHaveBeenCalled()
+    expect(createNodeSdkMock).not.toHaveBeenCalled()
+    expect(sdkShutdown).not.toHaveBeenCalled()
+    expect(sentryClose).not.toHaveBeenCalled()
+    expect(logger.info.mock.calls).toEqual([
+      [
+        { event: 'observability_initialized', otel: false, sentry: false },
+        'observability initialized',
       ],
-      warnCalls: [],
-    })
+    ])
+    expect(logger.warn).not.toHaveBeenCalled()
   })
 
   it('runs the underlying shutdown only once across repeated calls', async () => {
     const handle = initObservability(FULL_ENV)
-    const first = handle.shutdown()
-    const second = handle.shutdown()
-    await expect(Promise.all([first, second])).resolves.toEqual([
-      undefined,
-      undefined,
-    ])
-    await expect(handle.shutdown()).resolves.toBeUndefined()
+    await Promise.all([handle.shutdown(), handle.shutdown()])
+    await handle.shutdown()
 
-    expect({
-      sameReference: first === second,
-      sdkShutdownCount: sdkShutdown.mock.calls.length,
-      sentryCloseCount: sentryClose.mock.calls.length,
-    }).toEqual({
-      sameReference: true,
-      sdkShutdownCount: 1,
-      sentryCloseCount: 1,
-    })
+    expect(sdkShutdown).toHaveBeenCalledTimes(1)
+    expect(sentryClose).toHaveBeenCalledTimes(1)
   })
 
   it('logs a warn event and returns a no-op handle when initialization throws', async () => {
@@ -271,23 +218,17 @@ describe('initObservability', () => {
     const handle = initObservability(FULL_ENV, { logger })
     await handle.shutdown()
 
-    expect({
-      sentryValidateCount: sentryValidate.mock.calls.length,
-      infoCalls: logger.info.mock.calls,
-      warnCalls: logger.warn.mock.calls,
-    }).toEqual({
-      sentryValidateCount: 0,
-      infoCalls: [],
-      warnCalls: [
-        [
-          {
-            event: 'observability_init_failed',
-            error: 'boom: sdk.start failed',
-          },
-          'failed to initialize observability',
-        ],
+    expect(sentryValidate).not.toHaveBeenCalled()
+    expect(logger.info).not.toHaveBeenCalled()
+    expect(logger.warn.mock.calls).toEqual([
+      [
+        {
+          event: 'observability_init_failed',
+          error: 'boom: sdk.start failed',
+        },
+        'failed to initialize observability',
       ],
-    })
+    ])
   })
 
   it('only emits the booleans / event name in the init log payload — never DSN or OTLP endpoint', () => {
