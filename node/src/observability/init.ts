@@ -40,12 +40,8 @@ const noopLogger: ObservabilityLogger = {
   warn: () => {},
 }
 
-const noopHandle: ObservabilityHandle = { shutdown: async () => {} }
-
-// `initObservability` installs SIGTERM/SIGINT once for the process lifetime —
-// a repeated call (e.g. in tests or a hot-reload loop) must not stack a second
-// pair of listeners that would each re-deliver the signal.
-let signalsInstalled = false
+export const isObservabilityConfigured = (env: ObservabilityEnv): boolean =>
+  isOtelConfigured(env) || isSentryConfigured(env)
 
 const flushAndLog = (
   otelSdk: { shutdown(): Promise<unknown> } | undefined,
@@ -85,6 +81,12 @@ export const initObservability = (
   } = options
   const otel = isOtelConfigured(env)
   const sentry = isSentryConfigured(env)
+
+  if (!otel && !sentry) {
+    throw new Error(
+      'Observability is not configured. At least one of Sentry (SENTRY_DSN) or OpenTelemetry (OTEL_EXPORTER_OTLP_ENDPOINT) must be configured. Provide dummy values in development if you do not want to ship telemetry.',
+    )
+  }
 
   let sentryStarted = false
   let otelSdk: ReturnType<typeof createNodeSdk> | undefined
@@ -126,11 +128,22 @@ export const initObservability = (
       'observability initialized',
     )
 
-    if (!sentryStarted && otelSdk === undefined) return noopHandle
-
     let shutdownPromise: Promise<void> | undefined
+    // `onSignal` closes over the per-instance `shutdown`. Register listeners
+    // before defining `shutdown` so the cleanup inside `shutdown` can `off`
+    // the same function reference.
+    const onSignal = (signal: NodeJS.Signals): void => {
+      void shutdown().finally(() => {
+        process.kill(process.pid, signal)
+      })
+    }
     const shutdown = (): Promise<void> => {
       if (shutdownPromise) return shutdownPromise
+      // Detach the listeners on first shutdown so the closure (otelSdk,
+      // logger, etc.) can be released and a second initObservability call
+      // in the same process is not eclipsed by a stale listener.
+      process.off('SIGTERM', onSignal)
+      process.off('SIGINT', onSignal)
       shutdownPromise = flushAndLog(
         otelSdk,
         sentryStarted,
@@ -139,20 +152,10 @@ export const initObservability = (
       )
       return shutdownPromise
     }
-
-    if (!signalsInstalled) {
-      // Re-send the signal after shutdown so Node's default termination
-      // still runs. `finally` (not `then`) so a throwing logger inside
-      // `flushAndLog` still lets the signal reach the default handler.
-      const onSignal = (signal: NodeJS.Signals): void => {
-        void shutdown().finally(() => {
-          process.kill(process.pid, signal)
-        })
-      }
-      process.once('SIGTERM', onSignal)
-      process.once('SIGINT', onSignal)
-      signalsInstalled = true
-    }
+    // Use `once` (not `on`) so a second delivery after the listener has
+    // detached itself falls through to Node's default handler.
+    process.once('SIGTERM', onSignal)
+    process.once('SIGINT', onSignal)
 
     return { shutdown }
   } catch (err) {
@@ -163,23 +166,10 @@ export const initObservability = (
       },
       'failed to initialize observability',
     )
-    // Lazy cleanup: defer the flush until the caller actually invokes
-    // `shutdown()`. Kicking off Promise.allSettled here would either run
-    // unobserved (silent telemetry loss) or surface as an unhandled
-    // rejection if the caller exits without awaiting the handle.
-    let lazyCleanup: Promise<void> | undefined
-    return {
-      shutdown: () => {
-        if (!lazyCleanup) {
-          lazyCleanup = flushAndLog(
-            otelSdk,
-            sentryStarted,
-            shutdownTimeoutMs,
-            logger,
-          )
-        }
-        return lazyCleanup
-      },
-    }
+    // Best-effort flush of whichever SDK already started before re-throwing,
+    // so the warn above (and any in-flight telemetry) is not lost to the
+    // process exiting on the propagated error.
+    void flushAndLog(otelSdk, sentryStarted, shutdownTimeoutMs, logger)
+    throw err
   }
 }

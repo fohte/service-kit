@@ -99,13 +99,14 @@ const observability = initObservability(process.env, {
 
 `initObservability(env, options)` does the following:
 
-1. Read `env`. Treat each SDK independently: only Sentry is initialized if just `SENTRY_*` is set, only OTel is started if just `OTEL_*` is set, and both run when both are set.
-2. If Sentry is configured, initialize Sentry first so its global hooks are in place before OTel starts.
-3. If OTel is configured, build `NodeSDK`. When Sentry is also enabled, register `SentryPropagator` and `SentryContextManager`. Call `start()`.
-4. If both SDKs are enabled, call `Sentry.validateOpenTelemetrySetup()` to confirm the wiring.
-5. Install idempotent SIGTERM / SIGINT handlers that flush both SDKs and re-deliver the signal so Node's default termination still runs.
-6. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])`.
-7. If initialization throws, log a `observability_init_failed` warn event and return a handle whose `shutdown()` awaits a best-effort cleanup of whichever SDK had already started.
+1. Read `env`. Fail fast (throw) if neither Sentry nor OpenTelemetry is configured — provide dummy values in development if telemetry is intentionally disabled. Use `isObservabilityConfigured(env)` to probe the env before calling.
+2. Treat each SDK independently: only Sentry is initialized when just `SENTRY_*` is set, only OTel is started when just `OTEL_*` is set, and both run when both are set.
+3. If Sentry is configured, initialize Sentry first so its global hooks are in place before OTel starts.
+4. If OTel is configured, build `NodeSDK`. When Sentry is also enabled, register `SentryPropagator` and `SentryContextManager`. Call `start()`.
+5. If both SDKs are enabled, call `Sentry.validateOpenTelemetrySetup()` to confirm the wiring.
+6. Register per-instance SIGTERM / SIGINT handlers that flush both SDKs and re-deliver the signal so Node's default termination still runs. The listeners detach themselves on first `shutdown()` call so a subsequent `initObservability` in the same process re-registers fresh handlers.
+7. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])`.
+8. If initialization throws after a partial start, log an `observability_init_failed` warn event, kick off a best-effort flush of whichever SDK had already started, and re-throw so the caller fails fast.
 
 ### Options
 

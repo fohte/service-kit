@@ -1,6 +1,7 @@
 export {
   initObservability,
   type InitObservabilityOptions,
+  isObservabilityConfigured,
   type ObservabilityEnv,
   type ObservabilityHandle,
   type ObservabilityLogger,

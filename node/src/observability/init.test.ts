@@ -181,21 +181,15 @@ describe('initObservability', () => {
     expect(logger.warn).not.toHaveBeenCalled()
   })
 
-  it('returns a no-op handle and logs only the init event when neither is configured', async () => {
+  it('throws when neither Sentry nor OpenTelemetry is configured', () => {
     const logger = makeLogger()
-    const handle = initObservability({}, { logger })
-    await handle.shutdown()
 
+    expect(() => initObservability({}, { logger })).toThrow(
+      /Observability is not configured/,
+    )
     expect(sentryInit).not.toHaveBeenCalled()
     expect(createNodeSdkMock).not.toHaveBeenCalled()
-    expect(sdkShutdown).not.toHaveBeenCalled()
-    expect(sentryClose).not.toHaveBeenCalled()
-    expect(logger.info.mock.calls).toEqual([
-      [
-        { event: 'observability_initialized', otel: false, sentry: false },
-        'observability initialized',
-      ],
-    ])
+    expect(logger.info).not.toHaveBeenCalled()
     expect(logger.warn).not.toHaveBeenCalled()
   })
 
@@ -208,16 +202,27 @@ describe('initObservability', () => {
     expect(sentryClose).toHaveBeenCalledTimes(1)
   })
 
-  it('logs a warn event and returns a no-op handle when initialization throws', async () => {
+  it('detaches its signal listeners on shutdown so a second init re-registers fresh handlers', async () => {
+    const before = process.listenerCount('SIGTERM')
+    const first = initObservability(FULL_ENV)
+    expect(process.listenerCount('SIGTERM')).toBe(before + 1)
+    await first.shutdown()
+    expect(process.listenerCount('SIGTERM')).toBe(before)
+
+    const second = initObservability(FULL_ENV)
+    expect(process.listenerCount('SIGTERM')).toBe(before + 1)
+    await second.shutdown()
+    expect(process.listenerCount('SIGTERM')).toBe(before)
+  })
+
+  it('logs a warn event and re-throws when initialization fails', () => {
     const logger = makeLogger()
     const boom = new Error('boom: sdk.start failed')
     sdkStart.mockImplementationOnce(() => {
       throw boom
     })
 
-    const handle = initObservability(FULL_ENV, { logger })
-    await handle.shutdown()
-
+    expect(() => initObservability(FULL_ENV, { logger })).toThrow(boom)
     expect(sentryValidate).not.toHaveBeenCalled()
     expect(logger.info).not.toHaveBeenCalled()
     expect(logger.warn.mock.calls).toEqual([
