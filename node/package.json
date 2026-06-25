@@ -13,7 +13,7 @@
     "url": "https://github.com/fohte/service-kit.git",
     "directory": "node"
   },
-  "packageManager": "pnpm@11.5.2",
+  "packageManager": "pnpm@11.7.0",
   "type": "module",
   "files": [
     "dist",
@@ -93,7 +93,7 @@
     "@tsconfig/strictest": "2.0.8",
     "@types/node": "24.13.2",
     "concurrently": "10.0.3",
-    "eslint": "10.4.1",
+    "eslint": "10.5.0",
     "prettier": "3.8.4",
     "typescript": "6.0.3",
     "vitest": "4.1.9"
