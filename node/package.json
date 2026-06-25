@@ -1,6 +1,6 @@
 {
   "name": "@fohte/service-kit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": false,
   "description": "Service bootstrap kit for Node.js: observability and other cross-cutting concerns shared across services.",
   "license": "MIT",
