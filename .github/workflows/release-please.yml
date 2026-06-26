@@ -40,6 +40,9 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    defaults:
+      run:
+        working-directory: node
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
@@ -49,9 +52,9 @@ jobs:
 
       - run: corepack enable
 
-      - run: pnpm -C node install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - run: pnpm -C node build
+      - run: pnpm build
 
       - name: Publish to npm
-        run: pnpm -C node publish --access public --no-git-checks --provenance
+        run: pnpm publish --access public --no-git-checks --provenance
