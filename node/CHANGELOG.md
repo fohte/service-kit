@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/fohte/service-kit/compare/node-v0.1.0...node-v0.1.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* **node:** resolve path aliases in build output with tsc-alias ([#26](https://github.com/fohte/service-kit/issues/26)) ([de29b65](https://github.com/fohte/service-kit/commit/de29b65b3e58f312fed359e7d91000bc74273678))
+
 ## [0.1.0](https://github.com/fohte/service-kit/compare/node-v0.1.0...node-v0.1.0) (2026-06-25)
 
 
