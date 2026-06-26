@@ -27,7 +27,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
     "lint": "eslint .",
     "format:eslint": "eslint --fix .",
     "format:prettier": "prettier --write .",
@@ -95,6 +95,7 @@
     "concurrently": "10.0.3",
     "eslint": "10.5.0",
     "prettier": "3.8.4",
+    "tsc-alias": "1.8.17",
     "typescript": "6.0.3",
     "vitest": "4.1.9"
   }
