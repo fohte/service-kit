@@ -49,7 +49,7 @@ jobs:
 
       - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
-          version: 2026.6.11
+          version: 2026.6.12
 
       - run: corepack enable
 
