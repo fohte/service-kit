@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/fohte/service-kit/compare/node-v0.1.1...node-v0.1.2) (2026-07-01)
+
+
+### Bug Fixes
+
+* **node/observability:** stop trace exporter from silently dropping spans against base-URL endpoints ([#30](https://github.com/fohte/service-kit/issues/30)) ([577f5dc](https://github.com/fohte/service-kit/commit/577f5dcaefa902fff9dd9fbe75a018643ae26b79))
+
 ## [0.1.1](https://github.com/fohte/service-kit/compare/node-v0.1.0...node-v0.1.1) (2026-06-26)
 
 
