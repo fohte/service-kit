@@ -84,7 +84,7 @@ export const initObservability = (
 
   if (!otel && !sentry) {
     throw new Error(
-      'Observability is not configured. At least one of Sentry (SENTRY_DSN) or OpenTelemetry (OTEL_EXPORTER_OTLP_ENDPOINT) must be configured. Provide dummy values in development if you do not want to ship telemetry.',
+      'Observability is not configured. At least one of Sentry (SENTRY_DSN) or OpenTelemetry (OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT) must be configured. Provide dummy values in development if you do not want to ship telemetry.',
     )
   }
 

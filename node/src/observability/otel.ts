@@ -10,7 +10,9 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
 
 export interface OtelEnv {
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string | undefined
+  readonly OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?: string | undefined
   readonly OTEL_EXPORTER_OTLP_HEADERS?: string | undefined
+  readonly OTEL_EXPORTER_OTLP_TRACES_HEADERS?: string | undefined
   readonly OTEL_SERVICE_NAME?: string | undefined
   readonly OTEL_RESOURCE_ATTRIBUTES?: string | undefined
 }
@@ -24,11 +26,28 @@ export interface OtelOptions {
   readonly contextManager?: ContextManager | undefined
 }
 
-const readEndpoint = (env: OtelEnv): string =>
+const readBaseEndpoint = (env: OtelEnv): string =>
   env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim() ?? ''
 
+const readTracesEndpointOverride = (env: OtelEnv): string =>
+  env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim() ?? ''
+
+// Per the OTLP exporter spec, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is used
+// verbatim while `OTEL_EXPORTER_OTLP_ENDPOINT` is a base URL that has the
+// signal path (`/v1/traces`) appended. Passing a base URL as `url` verbatim
+// (the SDK's default when `url` is set explicitly) makes collectors return
+// 404 and silently drops every span, so we join the signal path here.
+// https://opentelemetry.io/docs/specs/otel/protocol/exporter/
+export const resolveTracesEndpoint = (env: OtelEnv): string => {
+  const override = readTracesEndpointOverride(env)
+  if (override.length > 0) return override
+  const base = readBaseEndpoint(env)
+  if (base.length === 0) return ''
+  return `${base.replace(/\/+$/, '')}/v1/traces`
+}
+
 export const isOtelConfigured = (env: OtelEnv): boolean =>
-  readEndpoint(env).length > 0
+  resolveTracesEndpoint(env).length > 0
 
 const safeDecode = (raw: string): string => {
   try {
@@ -56,6 +75,12 @@ const parseKeyValueList = (raw: string | undefined): Record<string, string> => {
   return out
 }
 
+// Signal-specific headers override the generic ones per the OTLP spec.
+const resolveTracesHeaders = (env: OtelEnv): Record<string, string> => ({
+  ...parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS),
+  ...parseKeyValueList(env.OTEL_EXPORTER_OTLP_TRACES_HEADERS),
+})
+
 const resolveServiceName = (
   env: OtelEnv,
   extraAttributes: Record<string, string>,
@@ -77,10 +102,10 @@ const buildResource = (env: OtelEnv, serviceName: string): Resource => {
 }
 
 const createOtlpTraceExporter = (env: OtelEnv): OTLPTraceExporter => {
-  const endpoint = readEndpoint(env)
-  const headers = parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS)
+  const url = resolveTracesEndpoint(env)
+  const headers = resolveTracesHeaders(env)
   return new OTLPTraceExporter({
-    ...(endpoint.length > 0 ? { url: endpoint } : {}),
+    ...(url.length > 0 ? { url } : {}),
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
   })
 }
@@ -94,10 +119,10 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     propagator,
     contextManager,
   } = options
-  const endpoint = readEndpoint(env)
+  const endpoint = resolveTracesEndpoint(env)
   if (endpoint.length === 0) {
     throw new Error(
-      'OTEL_EXPORTER_OTLP_ENDPOINT is required to build the OpenTelemetry SDK. Provide a dummy endpoint in development if you do not have an OTLP collector configured.',
+      'OTEL_EXPORTER_OTLP_ENDPOINT (or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT) is required to build the OpenTelemetry SDK. Provide a dummy endpoint in development if you do not have an OTLP collector configured.',
     )
   }
   const extraAttributes = parseKeyValueList(env.OTEL_RESOURCE_ATTRIBUTES)

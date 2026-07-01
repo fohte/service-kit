@@ -19,17 +19,19 @@ This way the Sentry event quota is consumed by error events only.
 
 Every service reads the following environment variables. Values are expected to be injected by the operator's secret-delivery mechanism; the library itself ships no defaults.
 
-| Variable                      | Required | Purpose                                                                   |
-| ----------------------------- | -------- | ------------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | yes      | OTLP exporter endpoint URL                                                |
-| `OTEL_EXPORTER_OTLP_HEADERS`  | yes      | OTLP auth headers (e.g. `Authorization=Basic ...`)                        |
-| `OTEL_SERVICE_NAME`           | yes      | Same value as the `service.name` resource attribute                       |
-| `OTEL_RESOURCE_ATTRIBUTES`    | no       | Additional resource attributes (e.g. `deployment.environment=production`) |
-| `SENTRY_DSN`                  | yes      | Sentry project DSN                                                        |
-| `SENTRY_ENVIRONMENT`          | yes      | Sentry environment (e.g. `production`, `staging`)                         |
-| `SENTRY_RELEASE`              | no       | Release identifier (e.g. git commit SHA), injected from CI                |
+| Variable                             | Required | Purpose                                                                                                                                                                                                                                                                 |
+| ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`        | yes\*    | OTLP exporter base URL. The signal path (`/v1/traces`) is appended automatically, matching the OTLP spec. Set the base URL (e.g. `https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp`) — do not include `/v1/traces` yourself, or the collector will return 404. |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | yes\*    | Traces-specific override used verbatim. Prefer this over `OTEL_EXPORTER_OTLP_ENDPOINT` when the backend expects a fully-qualified traces URL. \*Either this or `OTEL_EXPORTER_OTLP_ENDPOINT` is required.                                                               |
+| `OTEL_EXPORTER_OTLP_HEADERS`         | yes      | OTLP auth headers shared by all signals (e.g. `Authorization=Basic ...`)                                                                                                                                                                                                |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS`  | no       | Traces-specific header override, merged on top of `OTEL_EXPORTER_OTLP_HEADERS`.                                                                                                                                                                                         |
+| `OTEL_SERVICE_NAME`                  | yes      | Same value as the `service.name` resource attribute                                                                                                                                                                                                                     |
+| `OTEL_RESOURCE_ATTRIBUTES`           | no       | Additional resource attributes (e.g. `deployment.environment=production`)                                                                                                                                                                                               |
+| `SENTRY_DSN`                         | yes      | Sentry project DSN                                                                                                                                                                                                                                                      |
+| `SENTRY_ENVIRONMENT`                 | yes      | Sentry environment (e.g. `production`, `staging`)                                                                                                                                                                                                                       |
+| `SENTRY_RELEASE`                     | no       | Release identifier (e.g. git commit SHA), injected from CI                                                                                                                                                                                                              |
 
-All `OTEL_*` variables follow the OpenTelemetry standard ([OpenTelemetry Environment Variable Specification](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/)). The library introduces no custom prefix.
+All `OTEL_*` variables follow the OpenTelemetry standard ([OpenTelemetry Environment Variable Specification](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), [OTLP exporter spec](https://opentelemetry.io/docs/specs/otel/protocol/exporter/)). The library introduces no custom prefix.
 
 ## Redact patterns
 
