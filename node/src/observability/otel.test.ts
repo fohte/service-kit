@@ -41,22 +41,21 @@ describe('isOtelConfigured', () => {
 })
 
 describe('resolveTracesEndpoint', () => {
-  it('appends /v1/traces to the base endpoint per the OTLP spec', () => {
-    expect(
-      resolveTracesEndpoint({
-        OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example',
-      }),
-    ).toBe('https://otlp.example/v1/traces')
-  })
-
-  it('appends /v1/traces to a base endpoint with a path prefix (Grafana Cloud gateway shape)', () => {
-    expect(
-      resolveTracesEndpoint({
-        OTEL_EXPORTER_OTLP_ENDPOINT:
-          'https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp',
-      }),
-    ).toBe(
-      'https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp/v1/traces',
+  it.each([
+    {
+      name: 'root base URL',
+      base: 'https://otlp.example',
+      expected: 'https://otlp.example/v1/traces',
+    },
+    {
+      name: 'base URL with a path prefix (Grafana Cloud gateway shape)',
+      base: 'https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp',
+      expected:
+        'https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp/v1/traces',
+    },
+  ])('appends /v1/traces to $name', ({ base, expected }) => {
+    expect(resolveTracesEndpoint({ OTEL_EXPORTER_OTLP_ENDPOINT: base })).toBe(
+      expected,
     )
   })
 

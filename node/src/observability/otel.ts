@@ -75,11 +75,15 @@ const parseKeyValueList = (raw: string | undefined): Record<string, string> => {
   return out
 }
 
-// Signal-specific headers override the generic ones per the OTLP spec.
-const resolveTracesHeaders = (env: OtelEnv): Record<string, string> => ({
-  ...parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS),
-  ...parseKeyValueList(env.OTEL_EXPORTER_OTLP_TRACES_HEADERS),
-})
+// Signal-specific headers fully replace the generic ones per the OTLP spec's
+// "takes precedence" wording, matching how the Python/Java OTel SDKs interpret
+// it. Merging would leak generic-only keys (e.g. a shared `Authorization`)
+// into traces exports that intentionally set a different header set.
+const resolveTracesHeaders = (env: OtelEnv): Record<string, string> => {
+  const override = env.OTEL_EXPORTER_OTLP_TRACES_HEADERS?.trim() ?? ''
+  if (override.length > 0) return parseKeyValueList(override)
+  return parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS)
+}
 
 const resolveServiceName = (
   env: OtelEnv,
