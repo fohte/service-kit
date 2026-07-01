@@ -29,18 +29,19 @@ export interface OtelOptions {
 const readBaseEndpoint = (env: OtelEnv): string =>
   env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim() ?? ''
 
-const readTracesEndpointOverride = (env: OtelEnv): string =>
-  env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim() ?? ''
-
 // Per the OTLP exporter spec, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is used
 // verbatim while `OTEL_EXPORTER_OTLP_ENDPOINT` is a base URL that has the
 // signal path (`/v1/traces`) appended. Passing a base URL as `url` verbatim
 // (the SDK's default when `url` is set explicitly) makes collectors return
 // 404 and silently drops every span, so we join the signal path here.
+// Signal-specific takes precedence even when set to an empty string — that
+// case falls through the trim to `''` and triggers `createNodeSdk`'s
+// missing-endpoint throw rather than silently using the base URL.
 // https://opentelemetry.io/docs/specs/otel/protocol/exporter/
 export const resolveTracesEndpoint = (env: OtelEnv): string => {
-  const override = readTracesEndpointOverride(env)
-  if (override.length > 0) return override
+  if (env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT !== undefined) {
+    return env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT.trim()
+  }
   const base = readBaseEndpoint(env)
   if (base.length === 0) return ''
   return `${base.replace(/\/+$/, '')}/v1/traces`
@@ -78,10 +79,13 @@ const parseKeyValueList = (raw: string | undefined): Record<string, string> => {
 // Signal-specific headers fully replace the generic ones per the OTLP spec's
 // "takes precedence" wording, matching how the Python/Java OTel SDKs interpret
 // it. Merging would leak generic-only keys (e.g. a shared `Authorization`)
-// into traces exports that intentionally set a different header set.
+// into traces exports that intentionally set a different header set. An
+// empty `OTEL_EXPORTER_OTLP_TRACES_HEADERS` still takes precedence and yields
+// no headers rather than falling back to the generic value.
 const resolveTracesHeaders = (env: OtelEnv): Record<string, string> => {
-  const override = env.OTEL_EXPORTER_OTLP_TRACES_HEADERS?.trim() ?? ''
-  if (override.length > 0) return parseKeyValueList(override)
+  if (env.OTEL_EXPORTER_OTLP_TRACES_HEADERS !== undefined) {
+    return parseKeyValueList(env.OTEL_EXPORTER_OTLP_TRACES_HEADERS)
+  }
   return parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS)
 }
 

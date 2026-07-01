@@ -80,6 +80,15 @@ describe('resolveTracesEndpoint', () => {
   it('returns an empty string when no endpoint is configured', () => {
     expect(resolveTracesEndpoint({})).toBe('')
   })
+
+  it('lets an empty traces-specific endpoint take precedence over the base endpoint per the OTLP spec', () => {
+    expect(
+      resolveTracesEndpoint({
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: '',
+      }),
+    ).toBe('')
+  })
 })
 
 describe('createNodeSdk', () => {
