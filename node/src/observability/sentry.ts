@@ -72,6 +72,11 @@ export const initSentry = (
     environment,
     release: env.SENTRY_RELEASE,
     skipOpenTelemetrySetup: true,
+    // SentryPropagator (installed by init.ts when Sentry is started) only
+    // injects the W3C `traceparent` header when this option is true. Without
+    // it, downstream services silently lose cross-service trace linking even
+    // when the caller is not shipping spans to Sentry.
+    propagateTraceparent: true,
     beforeSend: (event: ErrorEvent) => redactEvent(event, redactOptions),
     ignoreErrors: [...NOISE_PATTERNS, ...(extraIgnoreErrors ?? [])],
     ...sentryOptions,
