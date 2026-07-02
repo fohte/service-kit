@@ -11,7 +11,7 @@ const initMock = vi.fn((options: Record<string, unknown>) => {
 vi.mock('@sentry/node', () => ({ init: initMock }))
 
 const lastInitOptions = (): Record<string, unknown> => {
-  const call = initMock.mock.calls[0]
+  const call = initMock.mock.calls[initMock.mock.calls.length - 1]
   if (call === undefined) throw new Error('initMock was not called')
   return call[0]
 }
