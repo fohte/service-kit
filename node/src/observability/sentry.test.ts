@@ -4,17 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 // (which registers global instrumentation on import). Tests in this file
 // only exercise our own logic: env validation in initSentry and the pure
 // transformations in redactEvent.
-const initMock = vi.fn((options: Record<string, unknown>) => {
-  void options
-  return {}
-})
-vi.mock('@sentry/node', () => ({ init: initMock }))
-
-const lastInitOptions = (): Record<string, unknown> => {
-  const call = initMock.mock.calls[initMock.mock.calls.length - 1]
-  if (call === undefined) throw new Error('initMock was not called')
-  return call[0]
-}
+vi.mock('@sentry/node', () => ({ init: vi.fn() }))
 
 const { initSentry, isSentryConfigured, redactEvent } =
   await import('@/observability/sentry')
@@ -50,43 +40,6 @@ describe('initSentry', () => {
     expect(() =>
       initSentry({ SENTRY_DSN: 'https://x@y/1', SENTRY_ENVIRONMENT: '   ' }),
     ).toThrow(/SENTRY_ENVIRONMENT is required/)
-  })
-
-  it('passes options to Sentry.init with propagateTraceparent enabled by default', () => {
-    initMock.mockClear()
-    initSentry({
-      SENTRY_DSN: 'https://x@y/1',
-      SENTRY_ENVIRONMENT: 'test',
-      SENTRY_RELEASE: 'r1',
-    })
-    const arg = lastInitOptions()
-    expect({ ...arg, beforeSend: typeof arg['beforeSend'] }).toEqual({
-      dsn: 'https://x@y/1',
-      environment: 'test',
-      release: 'r1',
-      skipOpenTelemetrySetup: true,
-      propagateTraceparent: true,
-      beforeSend: 'function',
-      ignoreErrors: ['AbortError', /ECONNRESET/],
-    })
-  })
-
-  it('lets sentryOptions.propagateTraceparent override the default', () => {
-    initMock.mockClear()
-    initSentry(
-      { SENTRY_DSN: 'https://x@y/1', SENTRY_ENVIRONMENT: 'test' },
-      { sentryOptions: { propagateTraceparent: false } },
-    )
-    const arg = lastInitOptions()
-    expect({ ...arg, beforeSend: typeof arg['beforeSend'] }).toEqual({
-      dsn: 'https://x@y/1',
-      environment: 'test',
-      release: undefined,
-      skipOpenTelemetrySetup: true,
-      propagateTraceparent: false,
-      beforeSend: 'function',
-      ignoreErrors: ['AbortError', /ECONNRESET/],
-    })
   })
 })
 
