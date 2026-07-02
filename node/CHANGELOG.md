@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/fohte/service-kit/compare/node-v0.1.2...node-v0.1.3) (2026-07-02)
+
+
+### Bug Fixes
+
+* **node/observability:** propagate W3C traceparent when Sentry is initialized ([#32](https://github.com/fohte/service-kit/issues/32)) ([fe33ad1](https://github.com/fohte/service-kit/commit/fe33ad1a4a96d00a35df7e71fd3ebd754c278127))
+
 ## [0.1.2](https://github.com/fohte/service-kit/compare/node-v0.1.1...node-v0.1.2) (2026-07-01)
 
 
