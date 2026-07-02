@@ -52,9 +52,6 @@ describe('initSentry', () => {
     ).toThrow(/SENTRY_ENVIRONMENT is required/)
   })
 
-  // Sentry's SentryPropagator (installed by init.ts when Sentry is started)
-  // only injects the W3C `traceparent` header when propagateTraceparent is
-  // true, so this default must not silently regress.
   it('passes options to Sentry.init with propagateTraceparent enabled by default', () => {
     initMock.mockClear()
     initSentry({
