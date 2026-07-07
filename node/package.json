@@ -13,7 +13,7 @@
     "url": "https://github.com/fohte/service-kit.git",
     "directory": "node"
   },
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.9.0",
   "type": "module",
   "files": [
     "dist",
@@ -77,9 +77,9 @@
     }
   },
   "devDependencies": {
-    "@commitlint/cli": "21.0.2",
+    "@commitlint/cli": "21.1.0",
     "@eslint/eslintrc": "3.3.5",
-    "@fohte/eslint-config": "0.3.4",
+    "@fohte/eslint-config": "0.3.5",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/auto-instrumentations-node": "0.77.0",
     "@opentelemetry/exporter-trace-otlp-proto": "0.219.0",
@@ -93,8 +93,8 @@
     "@tsconfig/strictest": "2.0.8",
     "@types/node": "24.13.2",
     "concurrently": "10.0.3",
-    "eslint": "10.5.0",
-    "prettier": "3.8.4",
+    "eslint": "10.6.0",
+    "prettier": "3.9.4",
     "tsc-alias": "1.8.17",
     "typescript": "6.0.3",
     "vitest": "4.1.9"
