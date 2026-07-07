@@ -1,20 +1,19 @@
 # Changes here will be overwritten by Copier
-_commit: v0.8.11
+_commit: v0.8.12
 _src_path: https://github.com/fohte/generic-boilerplate
 auto_merge_release_pr: false
-description:
-  "@fohte's personal cross-language service bootstrap kit (@fohte/service-kit
-  for Node, fohte-service-kit crate for Rust)"
+description: '@fohte''s personal cross-language service bootstrap kit (@fohte/service-kit
+    for Node, fohte-service-kit crate for Rust)'
 is_public: true
 monorepo_node_workspace: false
 project_name: service-kit
 release_type: node
 repo_language: en
 subpackages:
-  - name: node
+-   name: node
     release_type: node
     type: node
-  - name: rust
+-   name: rust
     release_type: rust
     type: rust
 type: base
