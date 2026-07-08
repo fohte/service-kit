@@ -151,6 +151,19 @@ const createOtlpMetricExporter = (env: OtelEnv): OTLPMetricExporter => {
   })
 }
 
+// No metrics endpoint resolves when only OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is
+// set without a base OTEL_EXPORTER_OTLP_ENDPOINT — return `undefined` in that
+// case rather than pointing OTLPMetricExporter at its localhost:4318 default.
+export const createMetricReader = (
+  env: OtelEnv,
+): PeriodicExportingMetricReader | undefined => {
+  const metricsEndpoint = resolveMetricsEndpoint(env)
+  if (metricsEndpoint.length === 0) return undefined
+  return new PeriodicExportingMetricReader({
+    exporter: createOtlpMetricExporter(env),
+  })
+}
+
 export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   const {
     env,
@@ -188,17 +201,7 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   const mergedSpanProcessors = hasExtraProcessors
     ? [new BatchSpanProcessor(traceExporter), ...spanProcessors]
     : undefined
-  // No metrics endpoint resolves when only OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-  // is set without a base OTEL_EXPORTER_OTLP_ENDPOINT — leave metricReader
-  // unset in that case rather than pointing OTLPMetricExporter at its
-  // localhost:4318 default.
-  const metricsEndpoint = resolveMetricsEndpoint(env)
-  const metricReader =
-    metricsEndpoint.length > 0
-      ? new PeriodicExportingMetricReader({
-          exporter: createOtlpMetricExporter(env),
-        })
-      : undefined
+  const metricReader = createMetricReader(env)
   return new NodeSDK({
     resource,
     traceExporter,
@@ -207,6 +210,11 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     ...(mergedSpanProcessors ? { spanProcessors: mergedSpanProcessors } : {}),
     ...(propagator ? { textMapPropagator: propagator } : {}),
     ...(contextManager ? { contextManager } : {}),
-    ...(metricReader ? { metricReader } : {}),
+    // Always pass `metricReaders` (even as `[]`) rather than the deprecated
+    // singular `metricReader` option. Omitting both makes NodeSDK fall back
+    // to its own env-based auto-config (`getMetricReadersFromEnv`), which
+    // defaults to an OTLP reader pointed at localhost:4318 — silently
+    // reintroducing the no-endpoint case `createMetricReader` guards against.
+    metricReaders: metricReader ? [metricReader] : [],
   })
 }

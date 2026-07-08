@@ -1,6 +1,8 @@
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { describe, expect, it } from 'vitest'
 
 import {
+  createMetricReader,
   createNodeSdk,
   isOtelConfigured,
   resolveMetricsEndpoint,
@@ -133,6 +135,14 @@ describe('resolveMetricsEndpoint', () => {
     expect(resolveMetricsEndpoint({})).toBe('')
   })
 
+  it('returns an empty string when only the traces-specific endpoint is set, without falling back to it', () => {
+    expect(
+      resolveMetricsEndpoint({
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://otlp.example/v1/traces',
+      }),
+    ).toBe('')
+  })
+
   it('lets an empty metrics-specific endpoint take precedence over the base endpoint per the OTLP spec', () => {
     expect(
       resolveMetricsEndpoint({
@@ -140,6 +150,24 @@ describe('resolveMetricsEndpoint', () => {
         OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: '',
       }),
     ).toBe('')
+  })
+})
+
+describe('createMetricReader', () => {
+  it('returns undefined when no metrics endpoint is configured', () => {
+    expect(
+      createMetricReader({
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://otlp.example/v1/traces',
+      }),
+    ).toBeUndefined()
+  })
+
+  it('returns a PeriodicExportingMetricReader when a metrics endpoint resolves', () => {
+    expect(
+      createMetricReader({
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example',
+      }),
+    ).toBeInstanceOf(PeriodicExportingMetricReader)
   })
 })
 
