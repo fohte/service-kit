@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createNodeSdk,
   isOtelConfigured,
+  resolveMetricsEndpoint,
   resolveTracesEndpoint,
 } from '@/observability/otel'
 
@@ -86,6 +87,57 @@ describe('resolveTracesEndpoint', () => {
       resolveTracesEndpoint({
         OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example',
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: '',
+      }),
+    ).toBe('')
+  })
+})
+
+describe('resolveMetricsEndpoint', () => {
+  it.each([
+    {
+      name: 'root base URL',
+      base: 'https://otlp.example',
+      expected: 'https://otlp.example/v1/metrics',
+    },
+    {
+      name: 'base URL with a path prefix (Grafana Cloud gateway shape)',
+      base: 'https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp',
+      expected:
+        'https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp/v1/metrics',
+    },
+  ])('appends /v1/metrics to $name', ({ base, expected }) => {
+    expect(resolveMetricsEndpoint({ OTEL_EXPORTER_OTLP_ENDPOINT: base })).toBe(
+      expected,
+    )
+  })
+
+  it('strips trailing slashes before joining the signal path', () => {
+    expect(
+      resolveMetricsEndpoint({
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example///',
+      }),
+    ).toBe('https://otlp.example/v1/metrics')
+  })
+
+  it('uses the metrics-specific endpoint verbatim when set, ignoring the base endpoint', () => {
+    expect(
+      resolveMetricsEndpoint({
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'https://ignored.example/otlp',
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:
+          'https://otlp.example/custom/path/v1/metrics',
+      }),
+    ).toBe('https://otlp.example/custom/path/v1/metrics')
+  })
+
+  it('returns an empty string when no endpoint is configured', () => {
+    expect(resolveMetricsEndpoint({})).toBe('')
+  })
+
+  it('lets an empty metrics-specific endpoint take precedence over the base endpoint per the OTLP spec', () => {
+    expect(
+      resolveMetricsEndpoint({
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example',
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: '',
       }),
     ).toBe('')
   })

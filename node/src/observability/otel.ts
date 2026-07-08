@@ -1,8 +1,10 @@
 import type { ContextManager, TextMapPropagator } from '@opentelemetry/api'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Resource } from '@opentelemetry/resources'
 import { resourceFromAttributes } from '@opentelemetry/resources'
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import type { Sampler, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
@@ -11,8 +13,10 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
 export interface OtelEnv {
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string | undefined
   readonly OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?: string | undefined
+  readonly OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?: string | undefined
   readonly OTEL_EXPORTER_OTLP_HEADERS?: string | undefined
   readonly OTEL_EXPORTER_OTLP_TRACES_HEADERS?: string | undefined
+  readonly OTEL_EXPORTER_OTLP_METRICS_HEADERS?: string | undefined
   readonly OTEL_SERVICE_NAME?: string | undefined
   readonly OTEL_RESOURCE_ATTRIBUTES?: string | undefined
 }
@@ -45,6 +49,19 @@ export const resolveTracesEndpoint = (env: OtelEnv): string => {
   const base = readBaseEndpoint(env)
   if (base.length === 0) return ''
   return `${base.replace(/\/+$/, '')}/v1/traces`
+}
+
+// Same resolution as `resolveTracesEndpoint`, but for the metrics signal.
+// Metrics are additive: unlike traces, a missing endpoint here is not a
+// `createNodeSdk` error — it just leaves the metric reader unset and callers
+// fall back to the OTel API's no-op MeterProvider.
+export const resolveMetricsEndpoint = (env: OtelEnv): string => {
+  if (env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT !== undefined) {
+    return env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT.trim()
+  }
+  const base = readBaseEndpoint(env)
+  if (base.length === 0) return ''
+  return `${base.replace(/\/+$/, '')}/v1/metrics`
 }
 
 export const isOtelConfigured = (env: OtelEnv): boolean =>
@@ -89,6 +106,13 @@ const resolveTracesHeaders = (env: OtelEnv): Record<string, string> => {
   return parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS)
 }
 
+const resolveMetricsHeaders = (env: OtelEnv): Record<string, string> => {
+  if (env.OTEL_EXPORTER_OTLP_METRICS_HEADERS !== undefined) {
+    return parseKeyValueList(env.OTEL_EXPORTER_OTLP_METRICS_HEADERS)
+  }
+  return parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS)
+}
+
 const resolveServiceName = (
   env: OtelEnv,
   extraAttributes: Record<string, string>,
@@ -113,6 +137,15 @@ const createOtlpTraceExporter = (env: OtelEnv): OTLPTraceExporter => {
   const url = resolveTracesEndpoint(env)
   const headers = resolveTracesHeaders(env)
   return new OTLPTraceExporter({
+    ...(url.length > 0 ? { url } : {}),
+    ...(Object.keys(headers).length > 0 ? { headers } : {}),
+  })
+}
+
+const createOtlpMetricExporter = (env: OtelEnv): OTLPMetricExporter => {
+  const url = resolveMetricsEndpoint(env)
+  const headers = resolveMetricsHeaders(env)
+  return new OTLPMetricExporter({
     ...(url.length > 0 ? { url } : {}),
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
   })
@@ -155,6 +188,17 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   const mergedSpanProcessors = hasExtraProcessors
     ? [new BatchSpanProcessor(traceExporter), ...spanProcessors]
     : undefined
+  // No metrics endpoint resolves when only OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+  // is set without a base OTEL_EXPORTER_OTLP_ENDPOINT — leave metricReader
+  // unset in that case rather than pointing OTLPMetricExporter at its
+  // localhost:4318 default.
+  const metricsEndpoint = resolveMetricsEndpoint(env)
+  const metricReader =
+    metricsEndpoint.length > 0
+      ? new PeriodicExportingMetricReader({
+          exporter: createOtlpMetricExporter(env),
+        })
+      : undefined
   return new NodeSDK({
     resource,
     traceExporter,
@@ -163,5 +207,6 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     ...(mergedSpanProcessors ? { spanProcessors: mergedSpanProcessors } : {}),
     ...(propagator ? { textMapPropagator: propagator } : {}),
     ...(contextManager ? { contextManager } : {}),
+    ...(metricReader ? { metricReader } : {}),
   })
 }
