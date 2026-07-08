@@ -1,18 +1,32 @@
+import { createRequire } from 'node:module'
+
 import type { ContextManager, TextMapPropagator } from '@opentelemetry/api'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
+import type { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Resource } from '@opentelemetry/resources'
 import { resourceFromAttributes } from '@opentelemetry/resources'
+import type { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import type { Sampler, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
 
+// `@opentelemetry/exporter-metrics-otlp-proto` and `@opentelemetry/sdk-metrics`
+// are only `require`d lazily, inside `createMetricReader`, instead of statically
+// imported above. `otel.ts` is re-exported from the package's public entry
+// point, so a static import would make every consumer resolve these two
+// packages just to import anything from `@fohte/service-kit/observability` —
+// even ones who only use traces (or only Sentry) and never configure metrics.
+const lazyRequire = createRequire(import.meta.url)
+
 export interface OtelEnv {
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string | undefined
   readonly OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?: string | undefined
+  readonly OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?: string | undefined
   readonly OTEL_EXPORTER_OTLP_HEADERS?: string | undefined
   readonly OTEL_EXPORTER_OTLP_TRACES_HEADERS?: string | undefined
+  readonly OTEL_EXPORTER_OTLP_METRICS_HEADERS?: string | undefined
   readonly OTEL_SERVICE_NAME?: string | undefined
   readonly OTEL_RESOURCE_ATTRIBUTES?: string | undefined
 }
@@ -45,6 +59,19 @@ export const resolveTracesEndpoint = (env: OtelEnv): string => {
   const base = readBaseEndpoint(env)
   if (base.length === 0) return ''
   return `${base.replace(/\/+$/, '')}/v1/traces`
+}
+
+// Same resolution as `resolveTracesEndpoint`, but for the metrics signal.
+// Metrics are additive: unlike traces, a missing endpoint here is not a
+// `createNodeSdk` error — it just leaves the metric reader unset and callers
+// fall back to the OTel API's no-op MeterProvider.
+export const resolveMetricsEndpoint = (env: OtelEnv): string => {
+  if (env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT !== undefined) {
+    return env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT.trim()
+  }
+  const base = readBaseEndpoint(env)
+  if (base.length === 0) return ''
+  return `${base.replace(/\/+$/, '')}/v1/metrics`
 }
 
 export const isOtelConfigured = (env: OtelEnv): boolean =>
@@ -89,6 +116,13 @@ const resolveTracesHeaders = (env: OtelEnv): Record<string, string> => {
   return parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS)
 }
 
+const resolveMetricsHeaders = (env: OtelEnv): Record<string, string> => {
+  if (env.OTEL_EXPORTER_OTLP_METRICS_HEADERS !== undefined) {
+    return parseKeyValueList(env.OTEL_EXPORTER_OTLP_METRICS_HEADERS)
+  }
+  return parseKeyValueList(env.OTEL_EXPORTER_OTLP_HEADERS)
+}
+
 const resolveServiceName = (
   env: OtelEnv,
   extraAttributes: Record<string, string>,
@@ -115,6 +149,39 @@ const createOtlpTraceExporter = (env: OtelEnv): OTLPTraceExporter => {
   return new OTLPTraceExporter({
     ...(url.length > 0 ? { url } : {}),
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
+  })
+}
+
+const createOtlpMetricExporter = (env: OtelEnv): OTLPMetricExporter => {
+  const url = resolveMetricsEndpoint(env)
+  const headers = resolveMetricsHeaders(env)
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- `require()` returns `any`; this documents the known shape of the lazily-loaded OTel package.
+  const { OTLPMetricExporter } = lazyRequire(
+    '@opentelemetry/exporter-metrics-otlp-proto',
+  ) as typeof import('@opentelemetry/exporter-metrics-otlp-proto')
+  return new OTLPMetricExporter({
+    ...(url.length > 0 ? { url } : {}),
+    ...(Object.keys(headers).length > 0 ? { headers } : {}),
+  })
+}
+
+// The signal-specific-vs-base precedence is already resolved inside
+// `resolveMetricsEndpoint` (via `!== undefined`); the `.length` check here
+// only decides whether the already-resolved endpoint is non-empty. No metrics
+// endpoint resolves when only OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is set
+// without a base OTEL_EXPORTER_OTLP_ENDPOINT — return `undefined` in that case
+// rather than pointing OTLPMetricExporter at its localhost:4318 default.
+export const createMetricReader = (
+  env: OtelEnv,
+): PeriodicExportingMetricReader | undefined => {
+  const metricsEndpoint = resolveMetricsEndpoint(env)
+  if (metricsEndpoint.length === 0) return undefined
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- `require()` returns `any`; this documents the known shape of the lazily-loaded OTel package.
+  const { PeriodicExportingMetricReader } = lazyRequire(
+    '@opentelemetry/sdk-metrics',
+  ) as typeof import('@opentelemetry/sdk-metrics')
+  return new PeriodicExportingMetricReader({
+    exporter: createOtlpMetricExporter(env),
   })
 }
 
@@ -155,6 +222,7 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   const mergedSpanProcessors = hasExtraProcessors
     ? [new BatchSpanProcessor(traceExporter), ...spanProcessors]
     : undefined
+  const metricReader = createMetricReader(env)
   return new NodeSDK({
     resource,
     traceExporter,
@@ -163,5 +231,11 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     ...(mergedSpanProcessors ? { spanProcessors: mergedSpanProcessors } : {}),
     ...(propagator ? { textMapPropagator: propagator } : {}),
     ...(contextManager ? { contextManager } : {}),
+    // Always pass `metricReaders` (even as `[]`) rather than the deprecated
+    // singular `metricReader` option. Omitting both makes NodeSDK fall back
+    // to its own env-based auto-config (`getMetricReadersFromEnv`), which
+    // defaults to an OTLP reader pointed at localhost:4318 — silently
+    // reintroducing the no-endpoint case `createMetricReader` guards against.
+    metricReaders: metricReader ? [metricReader] : [],
   })
 }
