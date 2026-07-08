@@ -165,9 +165,12 @@ const createOtlpMetricExporter = (env: OtelEnv): OTLPMetricExporter => {
   })
 }
 
-// No metrics endpoint resolves when only OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is
-// set without a base OTEL_EXPORTER_OTLP_ENDPOINT — return `undefined` in that
-// case rather than pointing OTLPMetricExporter at its localhost:4318 default.
+// The signal-specific-vs-base precedence is already resolved inside
+// `resolveMetricsEndpoint` (via `!== undefined`); the `.length` check here
+// only decides whether the already-resolved endpoint is non-empty. No metrics
+// endpoint resolves when only OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is set
+// without a base OTEL_EXPORTER_OTLP_ENDPOINT — return `undefined` in that case
+// rather than pointing OTLPMetricExporter at its localhost:4318 default.
 export const createMetricReader = (
   env: OtelEnv,
 ): PeriodicExportingMetricReader | undefined => {
