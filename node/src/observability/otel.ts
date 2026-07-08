@@ -1,14 +1,24 @@
+import { createRequire } from 'node:module'
+
 import type { ContextManager, TextMapPropagator } from '@opentelemetry/api'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto'
+import type { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Resource } from '@opentelemetry/resources'
 import { resourceFromAttributes } from '@opentelemetry/resources'
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
+import type { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import type { Sampler, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
+
+// `@opentelemetry/exporter-metrics-otlp-proto` and `@opentelemetry/sdk-metrics`
+// are only `require`d lazily, inside `createMetricReader`, instead of statically
+// imported above. `otel.ts` is re-exported from the package's public entry
+// point, so a static import would make every consumer resolve these two
+// packages just to import anything from `@fohte/service-kit/observability` —
+// even ones who only use traces (or only Sentry) and never configure metrics.
+const lazyRequire = createRequire(import.meta.url)
 
 export interface OtelEnv {
   readonly OTEL_EXPORTER_OTLP_ENDPOINT?: string | undefined
@@ -145,6 +155,10 @@ const createOtlpTraceExporter = (env: OtelEnv): OTLPTraceExporter => {
 const createOtlpMetricExporter = (env: OtelEnv): OTLPMetricExporter => {
   const url = resolveMetricsEndpoint(env)
   const headers = resolveMetricsHeaders(env)
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- `require()` returns `any`; this documents the known shape of the lazily-loaded OTel package.
+  const { OTLPMetricExporter } = lazyRequire(
+    '@opentelemetry/exporter-metrics-otlp-proto',
+  ) as typeof import('@opentelemetry/exporter-metrics-otlp-proto')
   return new OTLPMetricExporter({
     ...(url.length > 0 ? { url } : {}),
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
@@ -159,6 +173,10 @@ export const createMetricReader = (
 ): PeriodicExportingMetricReader | undefined => {
   const metricsEndpoint = resolveMetricsEndpoint(env)
   if (metricsEndpoint.length === 0) return undefined
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- `require()` returns `any`; this documents the known shape of the lazily-loaded OTel package.
+  const { PeriodicExportingMetricReader } = lazyRequire(
+    '@opentelemetry/sdk-metrics',
+  ) as typeof import('@opentelemetry/sdk-metrics')
   return new PeriodicExportingMetricReader({
     exporter: createOtlpMetricExporter(env),
   })
