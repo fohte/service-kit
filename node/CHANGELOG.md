@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/fohte/service-kit/compare/node-v0.1.3...node-v0.1.4) (2026-07-08)
+
+
+### Features
+
+* **node/observability:** support exporting metrics over OTLP ([#37](https://github.com/fohte/service-kit/issues/37)) ([b4b4de1](https://github.com/fohte/service-kit/commit/b4b4de1424fc5197b66d661b95f138a3454a7e2c))
+
 ## [0.1.3](https://github.com/fohte/service-kit/compare/node-v0.1.2...node-v0.1.3) (2026-07-02)
 
 
