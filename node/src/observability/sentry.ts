@@ -147,8 +147,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 export interface CaptureWithFingerprintContext {
   readonly level?: SeverityLevel | undefined
   readonly tags?:
-    | Readonly<Record<string, string | number | boolean>>
-    | undefined
+    Readonly<Record<string, string | number | boolean>> | undefined
   readonly extras?: Readonly<Record<string, unknown>> | undefined
 }
 
