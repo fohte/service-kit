@@ -11,10 +11,17 @@ const { initSentry, isSentryConfigured, redactEvent } =
 
 describe('isSentryConfigured', () => {
   it('returns based on SENTRY_DSN presence', () => {
-    expect(isSentryConfigured({ SENTRY_DSN: 'https://x@y/1' })).toBe(true)
-    expect(isSentryConfigured({ SENTRY_DSN: '' })).toBe(false)
-    expect(isSentryConfigured({ SENTRY_DSN: '   ' })).toBe(false)
-    expect(isSentryConfigured({})).toBe(false)
+    expect({
+      withDsn: isSentryConfigured({ SENTRY_DSN: 'https://x@y/1' }),
+      emptyDsn: isSentryConfigured({ SENTRY_DSN: '' }),
+      blankDsn: isSentryConfigured({ SENTRY_DSN: '   ' }),
+      missing: isSentryConfigured({}),
+    }).toEqual({
+      withDsn: true,
+      emptyDsn: false,
+      blankDsn: false,
+      missing: false,
+    })
   })
 })
 
@@ -240,10 +247,17 @@ describe('redactEvent', () => {
 
     const result = redactEvent(input)
 
-    expect(result.extra.loopArray[0]).toBe('leaf')
-    expect(result.extra.loopArray[1]).toBe(result.extra.loopArray)
-    expect(result.extra.loopObject['id']).toBe('O1')
-    expect(result.extra.loopObject['self']).toBe(result.extra.loopObject)
+    expect({
+      arrayHead: result.extra.loopArray[0],
+      arrayCycles: result.extra.loopArray[1] === result.extra.loopArray,
+      objectId: result.extra.loopObject['id'],
+      objectCycles: result.extra.loopObject['self'] === result.extra.loopObject,
+    }).toEqual({
+      arrayHead: 'leaf',
+      arrayCycles: true,
+      objectId: 'O1',
+      objectCycles: true,
+    })
   })
 
   it('does not mutate the input event', () => {
