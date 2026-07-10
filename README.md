@@ -4,7 +4,17 @@
 
 ## Status
 
-Pre-release. No library code is published yet; this repository currently ships only the cross-language conventions under `docs/conventions/`. Install and usage instructions will be added once the first release lands.
+| Package              | Language | Status                                                                                                              |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `@fohte/service-kit` | Node.js  | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
+| `fohte-service-kit`  | Rust     | Not yet released                                                                                                    |
+
+## Packages
+
+| Package                        | Language | Provides                                                            |
+| ------------------------------ | -------- | ------------------------------------------------------------------- |
+| [`@fohte/service-kit`](./node) | Node.js  | Observability (OpenTelemetry + Sentry) setup shared across services |
+| `fohte-service-kit`            | Rust     | Not yet implemented                                                 |
 
 ## Conventions
 
