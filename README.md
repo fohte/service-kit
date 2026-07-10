@@ -4,10 +4,10 @@
 
 ## Status
 
-| Package              | Language | Status                                                                                                              |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `@fohte/service-kit` | Node.js  | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
-| `fohte-service-kit`  | Rust     | Not yet released                                                                                                    |
+| Package              | Status                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `@fohte/service-kit` | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
+| `fohte-service-kit`  | Not yet released                                                                                                    |
 
 ## Packages
 
