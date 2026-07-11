@@ -2,9 +2,18 @@
 
 @fohte's personal cross-language service bootstrap kit, intended to ship as the `@fohte/service-kit` npm package (Node) and the `fohte-service-kit` crate (Rust).
 
-## Status
+## Packages
 
-Pre-release. No library code is published yet; this repository currently ships only the cross-language conventions under `docs/conventions/`. Install and usage instructions will be added once the first release lands.
+| Package                        | Language | Status                                                                                                              |
+| ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| [`@fohte/service-kit`](./node) | Node.js  | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
+| [`fohte-service-kit`](./rust)  | Rust     | Not yet released                                                                                                    |
+
+### Modules
+
+| Package              | Module          | Provides                                   |
+| -------------------- | --------------- | ------------------------------------------ |
+| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services |
 
 ## Conventions
 
