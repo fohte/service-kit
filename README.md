@@ -2,19 +2,12 @@
 
 @fohte's personal cross-language service bootstrap kit, intended to ship as the `@fohte/service-kit` npm package (Node) and the `fohte-service-kit` crate (Rust).
 
-## Status
-
-| Package              | Status                                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `@fohte/service-kit` | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
-| `fohte-service-kit`  | Not yet released                                                                                                    |
-
 ## Packages
 
-| Package                        | Language | Provides                                                            |
-| ------------------------------ | -------- | ------------------------------------------------------------------- |
-| [`@fohte/service-kit`](./node) | Node.js  | Observability (OpenTelemetry + Sentry) setup shared across services |
-| [`fohte-service-kit`](./rust)  | Rust     | Not yet implemented                                                 |
+| Package                        | Language | Provides                                                            | Status                                                                                                              |
+| ------------------------------ | -------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [`@fohte/service-kit`](./node) | Node.js  | Observability (OpenTelemetry + Sentry) setup shared across services | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
+| [`fohte-service-kit`](./rust)  | Rust     | Not yet implemented                                                 | Not yet released                                                                                                    |
 
 ## Conventions
 
