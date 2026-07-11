@@ -6,9 +6,18 @@
 
 Everything in this repository must be both cross-language (implemented for the Node package and the Rust crate alike) and universal enough that any service repository should include it, regardless of what the service does. The [observability conventions](./docs/conventions/observability.md) are the reference example of this bar.
 
-## Status
+## Packages
 
-Pre-release. No library code is published yet; this repository currently ships only the cross-language conventions under `docs/conventions/`. Install and usage instructions will be added once the first release lands.
+| Package                        | Language | Status                                                                                                              |
+| ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| [`@fohte/service-kit`](./node) | Node.js  | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
+| [`fohte-service-kit`](./rust)  | Rust     | Not yet released                                                                                                    |
+
+### Modules
+
+| Package              | Module          | Provides                                   |
+| -------------------- | --------------- | ------------------------------------------ |
+| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services |
 
 ## Conventions
 
