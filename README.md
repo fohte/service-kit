@@ -4,10 +4,16 @@
 
 ## Packages
 
-| Package                        | Language | Provides                                                            | Status                                                                                                              |
-| ------------------------------ | -------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [`@fohte/service-kit`](./node) | Node.js  | Observability (OpenTelemetry + Sentry) setup shared across services | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
-| [`fohte-service-kit`](./rust)  | Rust     | Not yet implemented                                                 | Not yet released                                                                                                    |
+| Package                        | Language | Status                                                                                                              |
+| ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| [`@fohte/service-kit`](./node) | Node.js  | [![npm version](https://img.shields.io/npm/v/@fohte/service-kit)](https://www.npmjs.com/package/@fohte/service-kit) |
+| [`fohte-service-kit`](./rust)  | Rust     | Not yet released                                                                                                    |
+
+### Modules
+
+| Package              | Module          | Provides                                   |
+| -------------------- | --------------- | ------------------------------------------ |
+| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services |
 
 ## Conventions
 
