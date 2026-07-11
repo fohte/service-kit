@@ -85,9 +85,9 @@
     }
   },
   "devDependencies": {
-    "@commitlint/cli": "21.1.0",
+    "@commitlint/cli": "21.2.0",
     "@eslint/eslintrc": "3.3.5",
-    "@fohte/eslint-config": "0.3.5",
+    "@fohte/eslint-config": "0.3.6",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/auto-instrumentations-node": "0.77.0",
     "@opentelemetry/exporter-metrics-otlp-proto": "0.219.0",
