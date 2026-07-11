@@ -14,7 +14,7 @@
 | Package                        | Language | Provides                                                            |
 | ------------------------------ | -------- | ------------------------------------------------------------------- |
 | [`@fohte/service-kit`](./node) | Node.js  | Observability (OpenTelemetry + Sentry) setup shared across services |
-| `fohte-service-kit`            | Rust     | Not yet implemented                                                 |
+| [`fohte-service-kit`](./rust)  | Rust     | Not yet implemented                                                 |
 
 ## Conventions
 
