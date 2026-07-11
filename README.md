@@ -2,6 +2,10 @@
 
 @fohte's personal cross-language service bootstrap kit, intended to ship as the `@fohte/service-kit` npm package (Node) and the `fohte-service-kit` crate (Rust).
 
+## Scope
+
+Everything in this repository must be both cross-language (implemented for the Node package and the Rust crate alike) and universal enough that any service repository should include it, regardless of what the service does. The [observability conventions](./docs/conventions/observability.md) are the reference example of this bar.
+
 ## Packages
 
 | Package                        | Language | Status                                                                                                              |
