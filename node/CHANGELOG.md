@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/fohte/service-kit/compare/node-v0.1.4...node-v0.1.5) (2026-07-11)
+
+
+### Bug Fixes
+
+* **node:** widen pre-1.0 OpenTelemetry peerDependencies ranges ([#43](https://github.com/fohte/service-kit/issues/43)) ([2ba779d](https://github.com/fohte/service-kit/commit/2ba779d21c70fd6be9a3c147e0674c6eca49aa73))
+
 ## [0.1.4](https://github.com/fohte/service-kit/compare/node-v0.1.3...node-v0.1.4) (2026-07-08)
 
 
