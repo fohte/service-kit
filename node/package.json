@@ -13,7 +13,7 @@
     "url": "https://github.com/fohte/service-kit.git",
     "directory": "node"
   },
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@11.11.0",
   "type": "module",
   "files": [
     "dist",
