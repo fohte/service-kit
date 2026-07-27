@@ -1,15 +1,9 @@
 allowBuilds:
   # required by vitest's transformer
   esbuild: true
-<<<<<<< before updating
   # required by @opentelemetry/exporter-trace-otlp-proto (transitive)
   protobufjs: true
-  # required by @fohte/eslint-config -> eslint-plugin-import-x for "@/*" resolution
-||||||| last update
-  # required by @fohte/eslint-config -> eslint-plugin-import-x for "@/*" resolution
-=======
   # required by @fohte/eslint-config -> eslint-plugin-import-x for module resolution
->>>>>>> after updating
   unrs-resolver: true
 
   # Dodge short-lived supply-chain attacks (e.g. shai-hulud, tinycolor) by
