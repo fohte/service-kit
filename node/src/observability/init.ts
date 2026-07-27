@@ -1,18 +1,21 @@
 import * as Sentry from '@sentry/node'
 import { SentryPropagator } from '@sentry/opentelemetry'
 
+import { BoundaryError } from '../errors'
 import {
   createNodeSdk,
   isOtelConfigured,
   type OtelEnv,
   type OtelOptions,
-} from '#observability/otel'
+} from './otel'
 import {
   initSentry,
   type InitSentryOptions,
   isSentryConfigured,
   type SentryEnv,
-} from '#observability/sentry'
+} from './sentry'
+
+export class ObservabilityInitError extends BoundaryError {}
 
 export interface ObservabilityEnv extends OtelEnv, SentryEnv {}
 
@@ -172,7 +175,7 @@ export const initObservability = (
     // so the warn above (and any in-flight telemetry) is not lost to the
     // process exiting on the propagated error.
     void flushAndLog(otelSdk, sentryStarted, shutdownTimeoutMs, logger)
-    // eslint-disable-next-line no-restricted-syntax -- rethrow after best-effort cleanup, per initObservability's throw-based contract
-    throw err
+    // eslint-disable-next-line no-restricted-syntax -- interop boundary: wrap and rethrow after best-effort cleanup, per initObservability's throw-based contract
+    throw new ObservabilityInitError('failed to initialize observability', err)
   }
 }

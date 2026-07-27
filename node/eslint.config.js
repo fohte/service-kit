@@ -12,4 +12,16 @@ export default config(
       'fohte/no-inline-object-in-expect': 'off',
     },
   },
+  {
+    // This package publishes only `dist` (see package.json "files"), so a `#`
+    // subpath import surviving into the compiled output would resolve via
+    // "imports" to a `./src/*.ts` path that doesn't exist for npm consumers.
+    // Relative imports compile to relative dist paths that always resolve,
+    // so these files (which cross-reference other observability modules and
+    // ship in the published bundle) are exempt from the relative-import ban.
+    files: ['src/observability/index.ts', 'src/observability/init.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
 )
