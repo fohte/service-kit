@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { OtelOptions } from '@/observability/otel'
+import type { OtelOptions } from '#observability/otel'
 
 // Stub @sentry/node and @sentry/opentelemetry: the real SDKs install global
 // instrumentation hooks on import that we don't want to run inside the test
@@ -46,9 +46,9 @@ vi.mock('@sentry/opentelemetry', () => ({
   SentryPropagator: FakeSentryPropagator,
 }))
 
-vi.mock('@/observability/otel', async () => {
-  const actual = await vi.importActual<typeof import('@/observability/otel')>(
-    '@/observability/otel',
+vi.mock('#observability/otel', async () => {
+  const actual = await vi.importActual<typeof import('#observability/otel')>(
+    '#observability/otel',
   )
   return {
     ...actual,
@@ -56,7 +56,8 @@ vi.mock('@/observability/otel', async () => {
   }
 })
 
-const { initObservability } = await import('@/observability/init')
+const { initObservability, ObservabilityInitError } =
+  await import('#observability/init')
 
 const FULL_ENV = {
   OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example/',
@@ -215,14 +216,34 @@ describe('initObservability', () => {
     expect(process.listenerCount('SIGTERM')).toBe(before)
   })
 
-  it('logs a warn event and re-throws when initialization fails', () => {
+  it('wraps the failure in ObservabilityInitError, logs a warn event, and rethrows', () => {
     const logger = makeLogger()
     const boom = new Error('boom: sdk.start failed')
     sdkStart.mockImplementationOnce(() => {
       throw boom
     })
 
-    expect(() => initObservability(FULL_ENV, { logger })).toThrow(boom)
+    let thrown: unknown
+    try {
+      initObservability(FULL_ENV, { logger })
+    } catch (err) {
+      thrown = err
+    }
+
+    if (!(thrown instanceof ObservabilityInitError)) {
+      throw new Error(
+        'expected initObservability to throw ObservabilityInitError',
+      )
+    }
+    expect({
+      name: thrown.name,
+      message: thrown.message,
+      cause: thrown.cause,
+    }).toEqual({
+      name: 'ObservabilityInitError',
+      message: 'failed to initialize observability',
+      cause: boom,
+    })
     expect(sentryValidate).not.toHaveBeenCalled()
     expect(logger.info).not.toHaveBeenCalled()
     expect(logger.warn.mock.calls).toEqual([

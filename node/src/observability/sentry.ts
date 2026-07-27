@@ -56,12 +56,14 @@ export const initSentry = (
 ): NodeClient => {
   const dsn = env.SENTRY_DSN?.trim() ?? ''
   if (dsn.length === 0) {
+    // eslint-disable-next-line no-restricted-syntax -- initSentry's public contract is to throw synchronously when required config is missing
     throw new Error(
       'SENTRY_DSN is required to initialize Sentry. Provide a dummy value in development if you intentionally do not want to ship events.',
     )
   }
   const environment = env.SENTRY_ENVIRONMENT?.trim() ?? ''
   if (environment.length === 0) {
+    // eslint-disable-next-line no-restricted-syntax -- initSentry's public contract is to throw synchronously when required config is missing
     throw new Error(
       'SENTRY_ENVIRONMENT is required to initialize Sentry. Provide a dummy value in development if you intentionally do not want to ship events.',
     )
@@ -82,6 +84,7 @@ export const initSentry = (
     ...sentryOptions,
   })
   if (client === undefined) {
+    // eslint-disable-next-line no-restricted-syntax -- initSentry's public contract is to throw synchronously when the underlying Sentry SDK fails to produce a client
     throw new Error(
       'Sentry.init returned no client; check the SDK options for invalid values.',
     )

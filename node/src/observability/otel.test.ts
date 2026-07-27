@@ -7,7 +7,7 @@ import {
   isOtelConfigured,
   resolveMetricsEndpoint,
   resolveTracesEndpoint,
-} from '@/observability/otel'
+} from '#observability/otel'
 
 describe('isOtelConfigured', () => {
   it('returns true when the base endpoint is set', () => {

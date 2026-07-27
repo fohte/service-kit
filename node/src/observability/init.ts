@@ -1,18 +1,21 @@
 import * as Sentry from '@sentry/node'
 import { SentryPropagator } from '@sentry/opentelemetry'
 
+import { BoundaryError } from '../errors'
 import {
   createNodeSdk,
   isOtelConfigured,
   type OtelEnv,
   type OtelOptions,
-} from '@/observability/otel'
+} from './otel'
 import {
   initSentry,
   type InitSentryOptions,
   isSentryConfigured,
   type SentryEnv,
-} from '@/observability/sentry'
+} from './sentry'
+
+export class ObservabilityInitError extends BoundaryError {}
 
 export interface ObservabilityEnv extends OtelEnv, SentryEnv {}
 
@@ -83,6 +86,7 @@ export const initObservability = (
   const sentry = isSentryConfigured(env)
 
   if (!otel && !sentry) {
+    // eslint-disable-next-line no-restricted-syntax -- initObservability's public contract is to throw synchronously when required config is missing
     throw new Error(
       'Observability is not configured. At least one of Sentry (SENTRY_DSN) or OpenTelemetry (OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT) must be configured. Provide dummy values in development if you do not want to ship telemetry.',
     )
@@ -91,6 +95,7 @@ export const initObservability = (
   let sentryStarted = false
   let otelSdk: ReturnType<typeof createNodeSdk> | undefined
 
+  // eslint-disable-next-line no-restricted-syntax -- best-effort cleanup before rethrowing, per initObservability's throw-based contract
   try {
     if (sentry) {
       initSentry(env, sentryOpts)
@@ -170,6 +175,7 @@ export const initObservability = (
     // so the warn above (and any in-flight telemetry) is not lost to the
     // process exiting on the propagated error.
     void flushAndLog(otelSdk, sentryStarted, shutdownTimeoutMs, logger)
-    throw err
+    // eslint-disable-next-line no-restricted-syntax -- interop boundary: wrap and rethrow after best-effort cleanup, per initObservability's throw-based contract
+    throw new ObservabilityInitError('failed to initialize observability', err)
   }
 }

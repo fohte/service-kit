@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@sentry/node', () => ({ init: vi.fn() }))
 
 const { initSentry, isSentryConfigured, redactEvent } =
-  await import('@/observability/sentry')
+  await import('#observability/sentry')
 
 describe('isSentryConfigured', () => {
   it('returns based on SENTRY_DSN presence', () => {

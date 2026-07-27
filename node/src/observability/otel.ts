@@ -11,6 +11,7 @@ import { NodeSDK } from '@opentelemetry/sdk-node'
 import type { Sampler, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
+import { Result } from 'neverthrow'
 
 // `@opentelemetry/exporter-metrics-otlp-proto` and `@opentelemetry/sdk-metrics`
 // are only `require`d lazily, inside `createMetricReader`, instead of statically
@@ -77,13 +78,13 @@ export const resolveMetricsEndpoint = (env: OtelEnv): string => {
 export const isOtelConfigured = (env: OtelEnv): boolean =>
   resolveTracesEndpoint(env).length > 0
 
-const safeDecode = (raw: string): string => {
-  try {
-    return decodeURIComponent(raw)
-  } catch {
-    return raw
-  }
-}
+const tryDecodeURIComponent = Result.fromThrowable(
+  decodeURIComponent,
+  () => undefined,
+)
+
+const safeDecode = (raw: string): string =>
+  tryDecodeURIComponent(raw).unwrapOr(raw)
 
 // Parses `key1=value1,key2=value2` per the W3C Baggage encoding used by the
 // OTEL_RESOURCE_ATTRIBUTES and OTEL_EXPORTER_OTLP_HEADERS spec. Entries with
@@ -196,6 +197,7 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   } = options
   const endpoint = resolveTracesEndpoint(env)
   if (endpoint.length === 0) {
+    // eslint-disable-next-line no-restricted-syntax -- createNodeSdk's public contract is to throw synchronously when required config is missing
     throw new Error(
       'OTEL_EXPORTER_OTLP_ENDPOINT (or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT) is required to build the OpenTelemetry SDK. Provide a dummy endpoint in development if you do not have an OTLP collector configured.',
     )
@@ -207,6 +209,7 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     defaultServiceName,
   )
   if (serviceName.length === 0) {
+    // eslint-disable-next-line no-restricted-syntax -- createNodeSdk's public contract is to throw synchronously when required config is missing
     throw new Error(
       'OTEL_SERVICE_NAME (or `service.name` in OTEL_RESOURCE_ATTRIBUTES, or the `defaultServiceName` option) is required to build the OpenTelemetry SDK.',
     )

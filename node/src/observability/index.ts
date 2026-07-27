@@ -4,14 +4,15 @@ export {
   isObservabilityConfigured,
   type ObservabilityEnv,
   type ObservabilityHandle,
+  ObservabilityInitError,
   type ObservabilityLogger,
-} from '@/observability/init'
+} from './init'
 export {
   createNodeSdk,
   isOtelConfigured,
   type OtelEnv,
   type OtelOptions,
-} from '@/observability/otel'
+} from './otel'
 export {
   captureWithFingerprint,
   type CaptureWithFingerprintContext,
@@ -24,4 +25,4 @@ export {
   type RedactOptions,
   type SentryEnv,
   type StringTruncator,
-} from '@/observability/sentry'
+} from './sentry'
