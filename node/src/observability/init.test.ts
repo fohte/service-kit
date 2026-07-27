@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { OtelOptions } from '@/observability/otel'
+import type { OtelOptions } from '#observability/otel'
 
 // Stub @sentry/node and @sentry/opentelemetry: the real SDKs install global
 // instrumentation hooks on import that we don't want to run inside the test
@@ -46,9 +46,9 @@ vi.mock('@sentry/opentelemetry', () => ({
   SentryPropagator: FakeSentryPropagator,
 }))
 
-vi.mock('@/observability/otel', async () => {
-  const actual = await vi.importActual<typeof import('@/observability/otel')>(
-    '@/observability/otel',
+vi.mock('#observability/otel', async () => {
+  const actual = await vi.importActual<typeof import('#observability/otel')>(
+    '#observability/otel',
   )
   return {
     ...actual,
@@ -56,7 +56,7 @@ vi.mock('@/observability/otel', async () => {
   }
 })
 
-const { initObservability } = await import('@/observability/init')
+const { initObservability } = await import('#observability/init')
 
 const FULL_ENV = {
   OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example/',
