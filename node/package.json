@@ -26,6 +26,9 @@
     },
     "./package.json": "./package.json"
   },
+  "imports": {
+    "#*": "./src/*.ts"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
     "lint": "eslint .",
@@ -84,10 +87,13 @@
       "optional": true
     }
   },
+  "dependencies": {
+    "neverthrow": "8.2.0"
+  },
   "devDependencies": {
     "@commitlint/cli": "21.2.1",
     "@eslint/eslintrc": "3.3.5",
-    "@fohte/eslint-config": "0.3.6",
+    "@fohte/eslint-config": "0.4.0",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/auto-instrumentations-node": "0.77.0",
     "@opentelemetry/exporter-metrics-otlp-proto": "0.219.0",
@@ -99,6 +105,7 @@
     "@opentelemetry/semantic-conventions": "1.41.1",
     "@sentry/node": "10.58.0",
     "@sentry/opentelemetry": "10.58.0",
+    "@ninoseki/eslint-plugin-neverthrow": "0.2.0",
     "@tsconfig/node-lts": "24.0.0",
     "@tsconfig/strictest": "2.0.8",
     "@types/node": "24.13.3",

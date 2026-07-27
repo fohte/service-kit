@@ -1,9 +1,15 @@
 import { config } from '@fohte/eslint-config'
 
 export default config(
+<<<<<<< before updating
   { typescript: { typeChecked: true } },
   { ignores: ['dist'] },
+||||||| last update
+  { typescript: { typeChecked: true } },
+=======
+>>>>>>> after updating
   {
+<<<<<<< before updating
     rules: {
       'no-restricted-imports': [
         'error',
@@ -23,5 +29,24 @@ export default config(
       // synthetic record of several related values under test.
       'fohte/no-inline-object-in-expect': 'off',
     },
+||||||| last update
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['./*', '../*'],
+              message:
+                'Please use absolute imports instead of relative imports.',
+            },
+          ],
+        },
+      ],
+    },
+=======
+    typescript: { typeChecked: true },
+    errorHandling: {},
+>>>>>>> after updating
   },
 )
