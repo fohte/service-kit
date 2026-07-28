@@ -17,11 +17,18 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 
 ### Modules
 
-| Package              | Module          | Provides                                                          |
-| -------------------- | --------------- | ----------------------------------------------------------------- |
-| `@fohte/service-kit` | `env`           | Fail-fast typed env var parsing with aggregated validation errors |
-| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services                        |
-| `fohte-service-kit`  | `logging`       | Env-driven JSONL log init with daily rotation                     |
+#### Node (`@fohte/service-kit`)
+
+| Module          | Provides                                                          |
+| --------------- | ----------------------------------------------------------------- |
+| `env`           | Fail-fast typed env var parsing with aggregated validation errors |
+| `observability` | OTel + Sentry setup shared across services                        |
+
+#### Rust (`fohte-service-kit`)
+
+| Module    | Provides                                      |
+| --------- | --------------------------------------------- |
+| `logging` | Env-driven JSONL log init with daily rotation |
 
 ## Conventions
 
