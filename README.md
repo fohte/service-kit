@@ -22,6 +22,7 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 | `@fohte/service-kit` | `env`           | Fail-fast typed env var parsing with aggregated validation errors                  |
 | `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services                                         |
 | `@fohte/service-kit` | `otel-register` | ESM loader hook registration for `node --import`, so OTel can patch Node built-ins |
+| `@fohte/service-kit` | `retry`         | Sleep + exponential-backoff retry helper                                           |
 
 ## Conventions
 
@@ -29,3 +30,5 @@ Language-agnostic conventions live under `docs/conventions/`. Each document is t
 
 - [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order
 - [Env conventions](./docs/conventions/env.md): fail-fast typed env var parsing with aggregated validation errors
+- [Retry conventions](./docs/conventions/retry.md): sleep + exponential-backoff retry helper, retry-predicate ownership
+  </content>
