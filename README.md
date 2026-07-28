@@ -15,9 +15,10 @@ Everything in this repository must be both cross-language (implemented for the N
 
 ### Modules
 
-| Package              | Module          | Provides                                   |
-| -------------------- | --------------- | ------------------------------------------ |
-| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services |
+| Package              | Module          | Provides                                      |
+| -------------------- | --------------- | --------------------------------------------- |
+| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services    |
+| `fohte-service-kit`  | `logging`       | Env-driven JSONL log init with daily rotation |
 
 ## Conventions
 

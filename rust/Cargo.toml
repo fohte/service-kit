@@ -1,13 +1,18 @@
 [package]
-name = "rust"
+name = "fohte-service-kit"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 thiserror = "=2.0.19"
+tracing = "=0.1.44"
+tracing-appender = "=0.2.5"
+tracing-subscriber = { version = "=0.3.23", features = ["json", "env-filter"] }
 
 [dev-dependencies]
 rstest = "=0.26.1"
+serde_json = "=1.0.151"
+tempfile = "=3.27.0"
 
 [lints.clippy]
 allow_attributes = "warn"
