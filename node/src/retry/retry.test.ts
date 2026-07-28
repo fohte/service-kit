@@ -1,7 +1,7 @@
-import { errAsync, okAsync, type Result } from 'neverthrow'
+import { errAsync, okAsync, type Result, type ResultAsync } from 'neverthrow'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { retry, sleep } from '#retry/retry'
+import { retry, type RetryOptions, sleep } from '#retry/retry'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -33,110 +33,97 @@ interface RetryCallRecord {
 }
 
 async function runRetry<T, E>(
-  fn: () => ReturnType<typeof retry<T, E>>,
-  fnMock: { mock: { calls: unknown[] } },
-  onRetry: { mock: { calls: unknown[] } },
+  fn: ReturnType<typeof vi.fn<() => ResultAsync<T, E>>>,
+  options: RetryOptions<E> & { onRetry: ReturnType<typeof vi.fn> },
 ): Promise<RetryCallRecord> {
-  const resultPromise = fn()
+  const resultPromise = retry(fn, options)
   await vi.runAllTimersAsync()
   const result: Result<T, E> = await resultPromise
 
   return {
     result: result.isOk() ? result.value : result.error,
-    fnCalls: fnMock.mock.calls.length,
-    onRetryCalls: onRetry.mock.calls,
+    fnCalls: fn.mock.calls.length,
+    onRetryCalls: options.onRetry.mock.calls,
   }
 }
 
 describe('retry', () => {
-  it('returns the ok result without retrying when the first attempt succeeds', async () => {
-    const fn = vi.fn(() => okAsync('done'))
-    const onRetry = vi.fn()
-
-    const record = await runRetry(() => retry(fn, { onRetry }), fn, onRetry)
-
-    expect(record).toEqual({
-      result: 'done',
-      fnCalls: 1,
-      onRetryCalls: [],
-    })
-  })
-
-  it('retries with exponential backoff and succeeds once an attempt succeeds within maxRetries', async () => {
+  it.each([
+    {
+      name: 'succeeds on the first attempt without retrying',
+      failuresBeforeSuccess: 0,
+      options: {},
+      expected: { result: 'done', fnCalls: 1, onRetryCalls: [] },
+    },
+    {
+      name: 'retries with exponential backoff then succeeds within maxRetries',
+      failuresBeforeSuccess: 2,
+      options: { maxRetries: 3, initialDelayMs: 100 },
+      expected: {
+        result: 'done',
+        fnCalls: 3,
+        onRetryCalls: [
+          [{ attempt: 1, delayMs: 100, error: 'fail' }],
+          [{ attempt: 2, delayMs: 200, error: 'fail' }],
+        ],
+      },
+    },
+    {
+      name: 'stops retrying and returns the original error immediately when shouldRetry rejects it',
+      failuresBeforeSuccess: Number.POSITIVE_INFINITY,
+      options: { shouldRetry: () => false },
+      expected: { result: 'fail', fnCalls: 1, onRetryCalls: [] },
+    },
+    {
+      name: 'gives up and returns the original error after exhausting maxRetries',
+      failuresBeforeSuccess: Number.POSITIVE_INFINITY,
+      options: { maxRetries: 2, initialDelayMs: 10 },
+      expected: {
+        result: 'fail',
+        fnCalls: 3,
+        onRetryCalls: [
+          [{ attempt: 1, delayMs: 10, error: 'fail' }],
+          [{ attempt: 2, delayMs: 20, error: 'fail' }],
+        ],
+      },
+    },
+    {
+      name: 'uses the default maxRetries (3) and initialDelayMs (100ms) when options are omitted',
+      failuresBeforeSuccess: Number.POSITIVE_INFINITY,
+      options: {},
+      expected: {
+        result: 'fail',
+        fnCalls: 4,
+        onRetryCalls: [
+          [{ attempt: 1, delayMs: 100, error: 'fail' }],
+          [{ attempt: 2, delayMs: 200, error: 'fail' }],
+          [{ attempt: 3, delayMs: 400, error: 'fail' }],
+        ],
+      },
+    },
+  ])('$name', async ({ failuresBeforeSuccess, options, expected }) => {
     let calls = 0
     const fn = vi.fn(() => {
       calls += 1
-      return calls <= 2 ? errAsync(`fail-${String(calls)}`) : okAsync('done')
+      return calls <= failuresBeforeSuccess ? errAsync('fail') : okAsync('done')
     })
     const onRetry = vi.fn()
 
-    const record = await runRetry(
-      () => retry(fn, { maxRetries: 3, initialDelayMs: 100, onRetry }),
-      fn,
-      onRetry,
-    )
+    const record = await runRetry(fn, { ...options, onRetry })
 
-    expect(record).toEqual({
-      result: 'done',
-      fnCalls: 3,
-      onRetryCalls: [
-        [{ attempt: 1, delayMs: 100, error: 'fail-1' }],
-        [{ attempt: 2, delayMs: 200, error: 'fail-2' }],
-      ],
-    })
+    expect(record).toEqual(expected)
   })
 
-  it('stops retrying and returns the original error immediately when shouldRetry rejects it', async () => {
-    const fn = vi.fn(() => errAsync('non-retryable'))
-    const onRetry = vi.fn()
+  it('does not require an onRetry callback', async () => {
+    const fn = vi.fn(() => errAsync('fail'))
 
-    const record = await runRetry(
-      () => retry(fn, { shouldRetry: () => false, onRetry }),
-      fn,
-      onRetry,
-    )
+    const resultPromise = retry(fn, { maxRetries: 1, initialDelayMs: 5 })
+    await vi.runAllTimersAsync()
+    const result: Result<string, string> = await resultPromise
 
-    expect(record).toEqual({
-      result: 'non-retryable',
-      fnCalls: 1,
-      onRetryCalls: [],
-    })
-  })
-
-  it('gives up and returns the original error after exhausting maxRetries', async () => {
-    const fn = vi.fn(() => errAsync('always-fails'))
-    const onRetry = vi.fn()
-
-    const record = await runRetry(
-      () => retry(fn, { maxRetries: 2, initialDelayMs: 10, onRetry }),
-      fn,
-      onRetry,
-    )
-
-    expect(record).toEqual({
-      result: 'always-fails',
-      fnCalls: 3,
-      onRetryCalls: [
-        [{ attempt: 1, delayMs: 10, error: 'always-fails' }],
-        [{ attempt: 2, delayMs: 20, error: 'always-fails' }],
-      ],
-    })
-  })
-
-  it('uses the default maxRetries (3) and initialDelayMs (100ms) when options are omitted', async () => {
-    const fn = vi.fn(() => errAsync('boom'))
-    const onRetry = vi.fn()
-
-    const record = await runRetry(() => retry(fn, { onRetry }), fn, onRetry)
-
-    expect(record).toEqual({
-      result: 'boom',
-      fnCalls: 4,
-      onRetryCalls: [
-        [{ attempt: 1, delayMs: 100, error: 'boom' }],
-        [{ attempt: 2, delayMs: 200, error: 'boom' }],
-        [{ attempt: 3, delayMs: 400, error: 'boom' }],
-      ],
-    })
+    expect({
+      result: result.isOk() ? result.value : result.error,
+      fnCalls: fn.mock.calls.length,
+    }).toEqual({ result: 'fail', fnCalls: 2 })
   })
 })

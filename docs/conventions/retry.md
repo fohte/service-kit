@@ -8,7 +8,7 @@ Conventions for the retry layer shared by `@fohte/service-kit` (Node) and `fohte
 
 ### Scope: sleep + exponential backoff only
 
-The module wraps the one recurring pattern found across services: a `sleep()` primitive plus an exponential-backoff retry loop around a single fallible operation. Rate limiting, circuit breaking, and HTTP client wrappers are out of scope — each service's client already has its own transport (octokit, a chat SDK, bare `fetch`, ...), and a general abstraction over that layer doesn't hold up across them.
+The module wraps the one recurring pattern found across services: a `sleep()` primitive plus an exponential-backoff retry loop around a single fallible operation. Rate limiting, circuit breaking, and HTTP client wrappers are out of scope — each service's client already owns its own transport, and a general abstraction over that layer doesn't hold up across them.
 
 ### Callers decide what's retryable
 
@@ -33,7 +33,7 @@ const result = await retry(() => fetchSomething(), {
 })
 ```
 
-`retry(fn, options)` calls `fn()` and, on `Err`, retries with delay `initialDelayMs * 2 ** attempt` (0-indexed) until either `fn()` resolves `Ok` or `maxRetries` is exhausted. The original error is returned unwrapped on exhaustion — wrap it in a domain-specific error via `.mapErr()` if the caller needs one.
+`retry(fn, options)` calls `fn()` and, on `Err`, retries with delay `initialDelayMs * 2 ** n` where `n` is the number of prior failures (0 for the first retry) until either `fn()` resolves `Ok` or `maxRetries` is exhausted. The `attempt` field passed to `onRetry` counts from 1 (the first retry), one higher than the exponent `n` used in the delay formula. The original error is returned unwrapped on exhaustion — wrap it in a domain-specific error via `.mapErr()` if the caller needs one.
 
 ### Options
 
