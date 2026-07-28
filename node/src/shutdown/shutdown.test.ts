@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('createShutdownHandler', () => {
-  it('runs steps in registration order and exits 0 when all succeed', async () => {
+  it('runs steps in order and reports a fully successful shutdown', async () => {
     const logger = makeLogger()
     const exit = vi.fn()
     const order: string[] = []
@@ -40,26 +40,33 @@ describe('createShutdownHandler', () => {
 
     await handle.shutdown('SIGTERM')
 
-    expect(order).toEqual(['drain', 'close-server'])
-    expect(exit).toHaveBeenCalledExactlyOnceWith(0)
-    expect(logger.info.mock.calls).toEqual([
-      [
-        {
-          event: 'shutdown_initiated',
-          signal: 'SIGTERM',
-          steps: ['drain', 'close-server'],
-        },
-        'shutdown signal received; running shutdown steps',
+    expect({
+      order,
+      exitCalls: exit.mock.calls,
+      infoCalls: logger.info.mock.calls,
+      warnCalls: logger.warn.mock.calls,
+    }).toEqual({
+      order: ['drain', 'close-server'],
+      exitCalls: [[0]],
+      infoCalls: [
+        [
+          {
+            event: 'shutdown_initiated',
+            signal: 'SIGTERM',
+            steps: ['drain', 'close-server'],
+          },
+          'shutdown signal received; running shutdown steps',
+        ],
+        [
+          { event: 'shutdown_completed', signal: 'SIGTERM', hadError: false },
+          'shutdown steps complete; exiting',
+        ],
       ],
-      [
-        { event: 'shutdown_completed', signal: 'SIGTERM', hadError: false },
-        'shutdown steps complete; exiting',
-      ],
-    ])
-    expect(logger.warn).not.toHaveBeenCalled()
+      warnCalls: [],
+    })
   })
 
-  it('logs a failing step and still runs the remaining steps, exiting 1', async () => {
+  it('continues past a failing step and reports a partially failed shutdown', async () => {
     const logger = makeLogger()
     const exit = vi.fn()
     const order: string[] = []
@@ -79,22 +86,39 @@ describe('createShutdownHandler', () => {
 
     await handle.shutdown('SIGTERM')
 
-    expect(order).toEqual(['close-server'])
-    expect(exit).toHaveBeenCalledExactlyOnceWith(1)
-    expect(logger.warn.mock.calls).toEqual([
-      [
-        {
-          event: 'shutdown_step_failed',
-          step: 'drain',
-          error: 'drain failed',
-        },
-        'shutdown step failed',
+    expect({
+      order,
+      exitCalls: exit.mock.calls,
+      infoCalls: logger.info.mock.calls,
+      warnCalls: logger.warn.mock.calls,
+    }).toEqual({
+      order: ['close-server'],
+      exitCalls: [[1]],
+      infoCalls: [
+        [
+          {
+            event: 'shutdown_initiated',
+            signal: 'SIGTERM',
+            steps: ['drain', 'close-server'],
+          },
+          'shutdown signal received; running shutdown steps',
+        ],
+        [
+          { event: 'shutdown_completed', signal: 'SIGTERM', hadError: true },
+          'shutdown steps complete; exiting',
+        ],
       ],
-    ])
-    expect(logger.info.mock.calls[1]).toEqual([
-      { event: 'shutdown_completed', signal: 'SIGTERM', hadError: true },
-      'shutdown steps complete; exiting',
-    ])
+      warnCalls: [
+        [
+          {
+            event: 'shutdown_step_failed',
+            step: 'drain',
+            error: 'drain failed',
+          },
+          'shutdown step failed',
+        ],
+      ],
+    })
   })
 
   it('runs the underlying steps only once across repeated calls', async () => {
@@ -131,13 +155,25 @@ describe('createShutdownHandler', () => {
 
       process.emit(signal, signal)
       await vi.waitFor(() => {
-        expect(exit).toHaveBeenCalledExactlyOnceWith(0)
+        expect(exit).toHaveBeenCalledTimes(1)
       })
 
-      expect(logger.info.mock.calls[0]).toEqual([
-        { event: 'shutdown_initiated', signal, steps: [] },
-        'shutdown signal received; running shutdown steps',
-      ])
+      expect({
+        exitCalls: exit.mock.calls,
+        infoCalls: logger.info.mock.calls,
+      }).toEqual({
+        exitCalls: [[0]],
+        infoCalls: [
+          [
+            { event: 'shutdown_initiated', signal, steps: [] },
+            'shutdown signal received; running shutdown steps',
+          ],
+          [
+            { event: 'shutdown_completed', signal, hadError: false },
+            'shutdown steps complete; exiting',
+          ],
+        ],
+      })
     },
   )
 
@@ -147,11 +183,34 @@ describe('createShutdownHandler', () => {
 
     await handle.shutdown()
 
-    expect(logger.info.mock.calls[0]?.[0]).toEqual({
-      event: 'shutdown_initiated',
-      signal: 'manual',
-      steps: [],
-    })
+    expect(logger.info.mock.calls).toEqual([
+      [
+        { event: 'shutdown_initiated', signal: 'manual', steps: [] },
+        'shutdown signal received; running shutdown steps',
+      ],
+      [
+        { event: 'shutdown_completed', signal: 'manual', hadError: false },
+        'shutdown steps complete; exiting',
+      ],
+    ])
+  })
+
+  it('does not produce an unhandled rejection when a signal-triggered shutdown fails', async () => {
+    const logger: ShutdownLogger = {
+      info: () => {
+        throw new Error('logger boom')
+      },
+      warn: () => {},
+    }
+    createShutdownHandler([], { logger, exit: vi.fn() })
+
+    const unhandled = vi.fn()
+    process.once('unhandledRejection', unhandled)
+    process.emit('SIGTERM', 'SIGTERM')
+    await new Promise((resolve) => setImmediate(resolve))
+    process.off('unhandledRejection', unhandled)
+
+    expect(unhandled).not.toHaveBeenCalled()
   })
 
   it('defaults to a no-op logger when none is provided', async () => {

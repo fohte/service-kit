@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node'
 import { SentryPropagator } from '@sentry/opentelemetry'
 
 import { BoundaryError } from '../errors'
+import { ownSignals } from '../signal-owner'
 import {
   createNodeSdk,
   isOtelConfigured,
@@ -136,21 +137,21 @@ export const initObservability = (
     )
 
     let shutdownPromise: Promise<void> | undefined
-    // `onSignal` closes over the per-instance `shutdown`. Register listeners
-    // before defining `shutdown` so the cleanup inside `shutdown` can `off`
-    // the same function reference.
     const onSignal = (signal: NodeJS.Signals): void => {
-      void shutdown().finally(() => {
-        process.kill(process.pid, signal)
-      })
+      // Sentry/OTel shutdown and the logger are outside our control; a
+      // rejection here must not surface as an unhandled rejection.
+      shutdown()
+        .finally(() => {
+          process.kill(process.pid, signal)
+        })
+        .catch(() => {})
     }
     const shutdown = (): Promise<void> => {
       if (shutdownPromise) return shutdownPromise
       // Detach the listeners on first shutdown so the closure (otelSdk,
       // logger, etc.) can be released and a second initObservability call
       // in the same process is not eclipsed by a stale listener.
-      process.off('SIGTERM', onSignal)
-      process.off('SIGINT', onSignal)
+      detachSignals()
       shutdownPromise = flushAndLog(
         otelSdk,
         sentryStarted,
@@ -163,12 +164,9 @@ export const initObservability = (
     // `@fohte/service-kit/shutdown`, which owns process signal registration
     // for the whole service; pass `shutdown` to it as one of its steps
     // instead of registering a second, competing SIGTERM/SIGINT listener.
-    if (registerSignalHandlers) {
-      // Use `once` (not `on`) so a second delivery after the listener has
-      // detached itself falls through to Node's default handler.
-      process.once('SIGTERM', onSignal)
-      process.once('SIGINT', onSignal)
-    }
+    const detachSignals = registerSignalHandlers
+      ? ownSignals(onSignal).detach
+      : () => {}
 
     return { shutdown }
   } catch (err) {

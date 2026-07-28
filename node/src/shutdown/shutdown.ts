@@ -1,5 +1,7 @@
 import { ResultAsync } from 'neverthrow'
 
+import { ownSignals } from '#signal-owner'
+
 export interface ShutdownStep {
   readonly name: string
   readonly run: () => Promise<void> | void
@@ -40,19 +42,19 @@ export const createShutdownHandler = (
   const exit = options.exit ?? ((code: number) => process.exit(code))
 
   let shutdownPromise: Promise<void> | undefined
-  // `onSignal` closes over the per-instance `shutdown`. Register listeners
-  // before defining `shutdown` so the cleanup inside `shutdown` can `off`
-  // the same function reference.
+
   const onSignal = (signal: NodeJS.Signals): void => {
-    void shutdown(signal)
+    // logger/exit are caller-supplied; a throw from either must not surface
+    // as an unhandled rejection and crash the process before later steps
+    // (e.g. closing a DB pool) get to run.
+    shutdown(signal).catch(() => {})
   }
 
   const shutdown = (signal = 'manual'): Promise<void> => {
     if (shutdownPromise) return shutdownPromise
     // Detach the listeners on first shutdown so a second createShutdownHandler
     // call in the same process is not eclipsed by a stale listener.
-    process.off('SIGTERM', onSignal)
-    process.off('SIGINT', onSignal)
+    detach()
 
     shutdownPromise = (async () => {
       logger.info(
@@ -92,10 +94,7 @@ export const createShutdownHandler = (
     return shutdownPromise
   }
 
-  // Use `once` (not `on`) so a second delivery after the listener has
-  // detached itself falls through to Node's default handler.
-  process.once('SIGTERM', onSignal)
-  process.once('SIGINT', onSignal)
+  const { detach } = ownSignals(onSignal)
 
   return { shutdown }
 }
