@@ -17,11 +17,12 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 
 ### Modules
 
-| Package              | Module          | Provides                                                          |
-| -------------------- | --------------- | ----------------------------------------------------------------- |
-| `@fohte/service-kit` | `env`           | Fail-fast typed env var parsing with aggregated validation errors |
-| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services                        |
-| `@fohte/service-kit` | `retry`         | Sleep + exponential-backoff retry helper                          |
+| Package              | Module          | Provides                                                                           |
+| -------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| `@fohte/service-kit` | `env`           | Fail-fast typed env var parsing with aggregated validation errors                  |
+| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services                                         |
+| `@fohte/service-kit` | `otel-register` | ESM loader hook registration for `node --import`, so OTel can patch Node built-ins |
+| `@fohte/service-kit` | `retry`         | Sleep + exponential-backoff retry helper                                           |
 
 ## Conventions
 
