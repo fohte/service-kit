@@ -164,11 +164,24 @@ The registration is unconditional: passing `--import` is itself the opt-in, so i
 
 ## Rust
 
-The Rust implementation will come later. Concrete API names will be appended to this document at implementation time. The intended stack is:
+### Logging
 
-- `tracing` + `tracing-subscriber` as the surface API for logs and spans.
-- `opentelemetry` + `opentelemetry-otlp` to send to the OTLP exporter.
+`fohte_service_kit::logging` provides the env-driven structured logging piece, independent of the OTel/Sentry integration described below.
+
+```rust
+use fohte_service_kit::logging::{self, Config};
+
+logging::init(&Config::new("MYAPP_LOG", log_dir, "myapp.log"))?;
+```
+
+`init(config)` reads the env var named by `config.env_var` as an `EnvFilter` directive (`info`, `my_crate=debug`, ...), falling back to `info` when unset, empty, or malformed, and disabling logging entirely when the value is `off` (case-insensitive). It then installs a global `tracing` subscriber that writes newline-delimited JSON to `<config.dir>/<config.filename_prefix>.YYYY-MM-DD`, rotating daily and keeping `config.retention` files (default 7; `0` disables pruning entirely rather than retaining none, matching `tracing-appender`'s own `max_log_files` semantics). A second call in the same process is a genuine no-op — the directory-creation and rotation-file-pruning side effects run at most once, matching the fact that the global subscriber itself can only be installed once. If a _different_ subscriber was already installed elsewhere in the process before `init`'s first call, `logging::InitError::SubscriberAlreadySet` is returned instead of silently doing nothing. Directory-creation or file-appender failures are likewise returned as `logging::InitError` rather than swallowed, so the caller decides the acceptable tolerance for a logging failure.
+
+### OpenTelemetry / Sentry
+
+The rest of the Rust implementation will come later. Concrete API names will be appended to this document at implementation time. The intended stack is:
+
+- `opentelemetry` + `opentelemetry-otlp` to send to the OTLP exporter, fed by `tracing` spans via `tracing-opentelemetry`.
 - The `sentry` crate (`sentry-rust`) for error reporting, with `sentry-tracing` bridging `tracing`'s `event::ERROR` to Sentry.
 - The same span/error split as on the Node side — spans are not double-sent to Sentry; only trace-context propagation crosses the boundary.
 
-Until the crate exists, this section is a policy statement for how Rust will satisfy the language-agnostic conventions (environment variables, redact patterns, startup order, shutdown order).
+Until this part exists, this subsection is a policy statement for how Rust will satisfy the language-agnostic conventions (environment variables, redact patterns, startup order, shutdown order).
