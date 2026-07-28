@@ -6,6 +6,7 @@
 //! `retention` files.
 
 use std::path::{Path, PathBuf};
+use std::sync::Once;
 
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -26,7 +27,9 @@ pub struct Config {
     pub dir: PathBuf,
     /// Prefix for rotated file names: `<filename_prefix>.YYYY-MM-DD`.
     pub filename_prefix: String,
-    /// Number of rotated files to retain.
+    /// Number of rotated files to retain. `0` disables pruning entirely
+    /// (matches `tracing-appender`'s `max_log_files` semantics) rather than
+    /// retaining none.
     pub retention: usize,
 }
 
@@ -62,6 +65,13 @@ pub enum InitError {
         #[source]
         source: tracing_appender::rolling::InitError,
     },
+    /// A subscriber other than the one built by [`init`] already claimed the
+    /// global default before `init`'s first call — e.g. another component in
+    /// the same process called `tracing_subscriber::fmt().init()` first.
+    /// [`init`]'s own idempotency (a second call is a no-op) is handled
+    /// separately and never reaches this variant.
+    #[error("a tracing subscriber is already installed globally: {0}")]
+    SubscriberAlreadySet(#[from] tracing_subscriber::util::TryInitError),
 }
 
 /// Resolves the raw env var value into an `EnvFilter` directive, or `None`
@@ -113,13 +123,11 @@ fn build_subscriber(
     ))
 }
 
-/// Installs the global `tracing` subscriber for JSONL file logging.
-///
-/// Idempotent: a second call in the same process is a no-op, since the
-/// global subscriber can only be installed once.
-pub fn init(config: &Config) -> Result<(), InitError> {
-    let raw = std::env::var(&config.env_var).ok();
-    let Some(level) = resolve_level(raw.as_deref()) else {
+/// Resolves the level and, unless disabled, builds and installs the
+/// subscriber. Split out from [`init`] so the disabled/off early return is
+/// exercised without going through the process-wide [`INIT`] guard.
+fn build_and_install(config: &Config, raw: Option<&str>) -> Result<(), InitError> {
+    let Some(level) = resolve_level(raw) else {
         return Ok(());
     };
 
@@ -129,19 +137,41 @@ pub fn init(config: &Config) -> Result<(), InitError> {
         config.retention,
         &level,
     )?;
-    let _ = subscriber.try_init();
+    subscriber.try_init()?;
     Ok(())
+}
+
+static INIT: Once = Once::new();
+
+/// Installs the global `tracing` subscriber for JSONL file logging.
+///
+/// Idempotent: a second call in the same process is a genuine no-op — guarded
+/// by [`INIT`] so the directory-creation / rotation-file-pruning side effects
+/// in [`build_subscriber`] run at most once, matching the fact that the
+/// global subscriber itself can only be installed once.
+pub fn init(config: &Config) -> Result<(), InitError> {
+    let raw = std::env::var(&config.env_var).ok();
+    let mut result = Ok(());
+    INIT.call_once(|| {
+        result = build_and_install(config, raw.as_deref());
+    });
+    result
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
 
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
     use serde_json::{Value, json};
     use tempfile::TempDir;
 
     use super::*;
+
+    #[fixture]
+    fn tmp_dir() -> TempDir {
+        TempDir::new().expect("tempdir")
+    }
 
     #[rstest]
     #[case::unset(None, Some("info"))]
@@ -176,16 +206,14 @@ mod tests {
     }
 
     #[rstest]
-    fn build_subscriber_writes_jsonl_events() {
-        let tmp = TempDir::new().expect("tempdir");
-
-        let subscriber = build_subscriber(tmp.path(), "test.log", 7, "info").expect("build");
+    fn build_subscriber_writes_jsonl_events(tmp_dir: TempDir) {
+        let subscriber = build_subscriber(tmp_dir.path(), "test.log", 7, "info").expect("build");
         tracing::subscriber::with_default(subscriber, || {
             tracing::info!(user_id = 42, "hello world");
         });
 
         assert_eq!(
-            read_normalized_events(tmp.path()),
+            read_normalized_events(tmp_dir.path()),
             vec![json!({
                 "timestamp": "<timestamp>",
                 "level": "INFO",
@@ -197,9 +225,8 @@ mod tests {
     }
 
     #[rstest]
-    fn build_subscriber_creates_missing_directory() {
-        let tmp = TempDir::new().expect("tempdir");
-        let dir = tmp.path().join("nested").join("logs");
+    fn build_subscriber_creates_missing_directory(tmp_dir: TempDir) {
+        let dir = tmp_dir.path().join("nested").join("logs");
         assert!(!dir.exists());
 
         build_subscriber(&dir, "test.log", 7, "info").expect("build");
@@ -208,9 +235,8 @@ mod tests {
     }
 
     #[rstest]
-    fn build_subscriber_fails_when_dir_is_blocked_by_a_file() {
-        let tmp = TempDir::new().expect("tempdir");
-        let blocker = tmp.path().join("blocker");
+    fn build_subscriber_fails_when_dir_is_blocked_by_a_file(tmp_dir: TempDir) {
+        let blocker = tmp_dir.path().join("blocker");
         fs::write(&blocker, "").expect("write blocker file");
         let dir = blocker.join("logs");
 
@@ -219,5 +245,16 @@ mod tests {
         };
 
         assert!(matches!(err, InitError::CreateDir { path, .. } if path == dir));
+    }
+
+    #[rstest]
+    fn build_and_install_is_noop_when_level_is_off(tmp_dir: TempDir) {
+        let dir = tmp_dir.path().join("logs");
+        let config = Config::new("UNUSED_ENV_VAR", dir.clone(), "test.log");
+
+        let result = build_and_install(&config, Some("off"));
+
+        assert!(result.is_ok());
+        assert!(!dir.exists());
     }
 }
