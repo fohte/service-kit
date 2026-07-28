@@ -4,7 +4,9 @@
 
 ## Scope
 
-Everything in this repository must be both cross-language (implemented for the Node package and the Rust crate alike) and universal enough that any service repository should include it, regardless of what the service does. The [observability conventions](./docs/conventions/observability.md) are the reference example of this bar.
+Everything in this repository must be universal enough that any service repository should include it, regardless of what the service does. The [observability conventions](./docs/conventions/observability.md) are the reference example of this bar.
+
+Cross-language parity (implemented for the Node package and the Rust crate alike) is a goal, not a prerequisite: a module may land in the Node package first and gain a Rust implementation later. Anything that only makes sense for a specific kind of service (e.g. a webhook-receiver toolkit) belongs in its own package, not here.
 
 ## Packages
 
@@ -17,6 +19,7 @@ Everything in this repository must be both cross-language (implemented for the N
 
 | Package              | Module          | Provides                                                                           |
 | -------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| `@fohte/service-kit` | `env`           | Fail-fast typed env var parsing with aggregated validation errors                  |
 | `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services                                         |
 | `@fohte/service-kit` | `otel-register` | ESM loader hook registration for `node --import`, so OTel can patch Node built-ins |
 
@@ -25,3 +28,4 @@ Everything in this repository must be both cross-language (implemented for the N
 Language-agnostic conventions live under `docs/conventions/`. Each document is the source of truth; how it stays in sync with the Node and Rust implementations is described in the document itself.
 
 - [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order
+- [Env conventions](./docs/conventions/env.md): fail-fast typed env var parsing with aggregated validation errors
