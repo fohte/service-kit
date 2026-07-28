@@ -22,6 +22,7 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 | Module          | Provides                                                                           |
 | --------------- | ---------------------------------------------------------------------------------- |
 | `env`           | Fail-fast typed env var parsing with aggregated validation errors                  |
+| `logger`        | Leveled structured logging with secret redaction and dev-mode pretty printing      |
 | `observability` | OTel + Sentry setup shared across services                                         |
 | `otel-register` | ESM loader hook registration for `node --import`, so OTel can patch Node built-ins |
 | `retry`         | Sleep + exponential-backoff retry helper                                           |
@@ -38,4 +39,5 @@ Language-agnostic conventions live under `docs/conventions/`. Each document is t
 
 - [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order, Rust structured logging
 - [Env conventions](./docs/conventions/env.md): fail-fast typed env var parsing with aggregated validation errors
+- [Logger conventions](./docs/conventions/logger.md): leveled structured logging, shared redact patterns, implementation-independent `Logger` interface
 - [Retry conventions](./docs/conventions/retry.md): sleep + exponential-backoff retry helper, retry-predicate ownership

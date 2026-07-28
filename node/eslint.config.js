@@ -25,6 +25,9 @@ export default config(
       'src/observability/init.ts',
       'src/env/index.ts',
       'src/retry/index.ts',
+      'src/logger/index.ts',
+      'src/logger/logger.ts',
+      'src/logger/redact.ts',
     ],
     rules: {
       'no-restricted-imports': 'off',
