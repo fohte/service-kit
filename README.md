@@ -4,7 +4,9 @@
 
 ## Scope
 
-Everything in this repository must be both cross-language (implemented for the Node package and the Rust crate alike) and universal enough that any service repository should include it, regardless of what the service does. The [observability conventions](./docs/conventions/observability.md) are the reference example of this bar.
+Everything in this repository must be universal enough that any service repository should include it, regardless of what the service does. The [observability conventions](./docs/conventions/observability.md) are the reference example of this bar.
+
+Cross-language parity (implemented for the Node package and the Rust crate alike) is a goal, not a prerequisite: a module may land in the Node package first and gain a Rust implementation later. Anything that only makes sense for a specific kind of service (e.g. a webhook-receiver toolkit) belongs in its own package, not here.
 
 ## Packages
 
