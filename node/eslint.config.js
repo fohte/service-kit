@@ -17,12 +17,13 @@ export default config(
     // subpath import surviving into the compiled output would resolve via
     // "imports" to a `./src/*.ts` path that doesn't exist for npm consumers.
     // Relative imports compile to relative dist paths that always resolve,
-    // so these files (which cross-reference other observability/retry
+    // so these files (which cross-reference other observability/env/retry
     // modules and ship in the published bundle) are exempt from the
     // relative-import ban.
     files: [
       'src/observability/index.ts',
       'src/observability/init.ts',
+      'src/env/index.ts',
       'src/retry/index.ts',
     ],
     rules: {
