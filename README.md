@@ -17,12 +17,14 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 
 ### Modules
 
-| Package              | Module          | Provides                                   |
-| -------------------- | --------------- | ------------------------------------------ |
-| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services |
+| Package              | Module          | Provides                                                          |
+| -------------------- | --------------- | ----------------------------------------------------------------- |
+| `@fohte/service-kit` | `env`           | Fail-fast typed env var parsing with aggregated validation errors |
+| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services                        |
 
 ## Conventions
 
 Language-agnostic conventions live under `docs/conventions/`. Each document is the source of truth; how it stays in sync with the Node and Rust implementations is described in the document itself.
 
 - [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order
+- [Env conventions](./docs/conventions/env.md): fail-fast typed env var parsing with aggregated validation errors
