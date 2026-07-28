@@ -20,6 +20,10 @@
     "README.md"
   ],
   "exports": {
+    "./env": {
+      "types": "./dist/env/index.d.ts",
+      "import": "./dist/env/index.js"
+    },
     "./observability": {
       "types": "./dist/observability/index.d.ts",
       "import": "./dist/observability/index.js"
@@ -111,7 +115,7 @@
     "@types/node": "24.13.3",
     "concurrently": "10.0.3",
     "eslint": "10.6.0",
-    "prettier": "3.9.5",
+    "prettier": "3.9.6",
     "tsc-alias": "1.8.17",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
