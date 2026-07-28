@@ -18,9 +18,11 @@ Everything in this repository must be both cross-language (implemented for the N
 | Package              | Module          | Provides                                   |
 | -------------------- | --------------- | ------------------------------------------ |
 | `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services |
+| `@fohte/service-kit` | `retry`         | Sleep + exponential-backoff retry helper   |
 
 ## Conventions
 
 Language-agnostic conventions live under `docs/conventions/`. Each document is the source of truth; how it stays in sync with the Node and Rust implementations is described in the document itself.
 
 - [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order
+- [Retry conventions](./docs/conventions/retry.md): sleep + exponential-backoff retry helper, retry-predicate ownership
