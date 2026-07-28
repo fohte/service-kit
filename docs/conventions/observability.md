@@ -160,7 +160,7 @@ The registration is unconditional: passing `--import` is itself the opt-in, so i
 
 ### Dependencies
 
-`@sentry/node` and the `@opentelemetry/*` packages are heavy, so they are declared as `peerDependencies` with `peerDependenciesMeta.optional`. Consumers install the versions they need directly, keeping `@fohte/service-kit` itself thin.
+`@sentry/node`, `@sentry/opentelemetry`, and the `@opentelemetry/*` packages other than `@opentelemetry/api` are declared as regular `dependencies` — consumers get a working install without pinning every OTel/Sentry package themselves. Only `@opentelemetry/api` stays a `peerDependency` (with `peerDependenciesMeta.optional`), since the OTel API forbids multiple instances in one process: a consumer that calls the API directly (e.g. `trace.getTracer()`) must resolve the same instance the kit uses internally.
 
 ## Rust
 
