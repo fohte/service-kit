@@ -179,3 +179,9 @@ export const initObservability = (
     throw new ObservabilityInitError('failed to initialize observability', err)
   }
 }
+
+export const initObservabilityIfConfigured = (
+  env: ObservabilityEnv,
+  options?: InitObservabilityOptions,
+): ObservabilityHandle | undefined =>
+  isObservabilityConfigured(env) ? initObservability(env, options) : undefined

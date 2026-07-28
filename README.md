@@ -15,9 +15,10 @@ Everything in this repository must be both cross-language (implemented for the N
 
 ### Modules
 
-| Package              | Module          | Provides                                   |
-| -------------------- | --------------- | ------------------------------------------ |
-| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services |
+| Package              | Module          | Provides                                                                           |
+| -------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| `@fohte/service-kit` | `observability` | OTel + Sentry setup shared across services                                         |
+| `@fohte/service-kit` | `otel-register` | ESM loader hook registration for `node --import`, so OTel can patch Node built-ins |
 
 ## Conventions
 

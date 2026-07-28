@@ -56,8 +56,11 @@ vi.mock('#observability/otel', async () => {
   }
 })
 
-const { initObservability, ObservabilityInitError } =
-  await import('#observability/init')
+const {
+  initObservability,
+  initObservabilityIfConfigured,
+  ObservabilityInitError,
+} = await import('#observability/init')
 
 const FULL_ENV = {
   OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example/',
@@ -267,5 +270,25 @@ describe('initObservability', () => {
         'observability initialized',
       ],
     ])
+  })
+})
+
+describe('initObservabilityIfConfigured', () => {
+  it('delegates to initObservability and returns its handle when configured', () => {
+    const logger = makeLogger()
+    const handle = initObservabilityIfConfigured(FULL_ENV, { logger })
+
+    expect(handle?.shutdown).toBeInstanceOf(Function)
+  })
+
+  it('returns undefined without initializing anything when not configured', () => {
+    const logger = makeLogger()
+    const handle = initObservabilityIfConfigured({}, { logger })
+
+    expect(handle).toBeUndefined()
+    expect(sentryInit).not.toHaveBeenCalled()
+    expect(createNodeSdkMock).not.toHaveBeenCalled()
+    expect(logger.info).not.toHaveBeenCalled()
+    expect(logger.warn).not.toHaveBeenCalled()
   })
 })

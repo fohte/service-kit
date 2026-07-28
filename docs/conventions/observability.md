@@ -101,6 +101,14 @@ const observability = initObservability(process.env, {
 // to wire them. Call `observability.shutdown()` directly for non-signal exits.
 ```
 
+`initObservabilityIfConfigured(env, options?)` wraps the `isObservabilityConfigured(env) ? initObservability(env, options) : undefined` guard that a service's bootstrap file otherwise repeats, as a single call:
+
+```ts
+import { initObservabilityIfConfigured } from '@fohte/service-kit/observability'
+
+initObservabilityIfConfigured(process.env)
+```
+
 `initObservability(env, options)` does the following:
 
 1. Read `env`. Fail fast (throw) if neither Sentry nor OpenTelemetry is configured — provide dummy values in development if telemetry is intentionally disabled. Use `isObservabilityConfigured(env)` to probe the env before calling.
@@ -135,6 +143,20 @@ initObservability(process.env, {
   ],
 })
 ```
+
+### ESM loader hook
+
+`@fohte/service-kit/otel-register` registers the `@opentelemetry/instrumentation` ESM loader hook (`register('@opentelemetry/instrumentation/hook.mjs', import.meta.url)`) as a side effect on import. Node's ESM loader bypasses `require()`, so without this hook registered before the service loads, `@opentelemetry/auto-instrumentations-node` never patches built-in modules like `http`, and no server-side spans are created.
+
+Preload it via `node --import`, ahead of the service entry point:
+
+```sh
+node --import @fohte/service-kit/otel-register dist/index.js
+```
+
+Because the hook is registered from inside `@fohte/service-kit` rather than the consumer's own code, the bare specifier resolves against this package's own dependency on `@opentelemetry/instrumentation` — the consumer does not need to depend on it directly, even under pnpm's strict `node_modules`.
+
+The registration is unconditional: passing `--import` is itself the opt-in, so it runs regardless of whether OTel is configured at runtime, and it throws synchronously if `@opentelemetry/instrumentation` is not installed. Only wire `--import @fohte/service-kit/otel-register` into services that install it (directly, or transitively via `@opentelemetry/auto-instrumentations-node`).
 
 ### Dependencies
 
