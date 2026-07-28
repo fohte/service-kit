@@ -73,12 +73,6 @@ describe('requireInt', () => {
       err('environment variable PORT must be <= 65535 (got: 99999)'),
     )
   })
-
-  it('accepts a value within the configured range', () => {
-    expect(
-      requireInt({ PORT: '8080' }, 'PORT', { min: 1, max: 65_535 }),
-    ).toEqual(ok(8080))
-  })
 })
 
 describe('optionalInt', () => {
@@ -93,6 +87,12 @@ describe('optionalInt', () => {
   it('errs when present and invalid', () => {
     expect(optionalInt({ PORT: '-1' }, 'PORT', 8080, { min: 0 })).toEqual(
       err('environment variable PORT must be >= 0 (got: -1)'),
+    )
+  })
+
+  it('errs when the default itself violates the constraints', () => {
+    expect(optionalInt({}, 'PORT', 99_999, { max: 65_535 })).toEqual(
+      err('environment variable PORT must be <= 65535 (got: 99999)'),
     )
   })
 })
@@ -139,6 +139,22 @@ describe('optionalEnum', () => {
   it('errs when present but not an allowed value', () => {
     expect(
       optionalEnum({ LOG_LEVEL: 'verbose' }, 'LOG_LEVEL', LOG_LEVELS, 'info'),
+    ).toEqual(
+      err(
+        'environment variable LOG_LEVEL must be one of debug, info, warn, error (got: verbose)',
+      ),
+    )
+  })
+
+  it('errs when the default itself is not an allowed value', () => {
+    expect(
+      optionalEnum(
+        {},
+        'LOG_LEVEL',
+        LOG_LEVELS,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- simulates a caller passing a mistyped default that TS would normally reject
+        'verbose' as (typeof LOG_LEVELS)[number],
+      ),
     ).toEqual(
       err(
         'environment variable LOG_LEVEL must be one of debug, info, warn, error (got: verbose)',

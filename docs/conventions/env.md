@@ -50,16 +50,16 @@ if (result.isErr()) {
 
 Each parser reads a single key from an `EnvSource` (`Readonly<Record<string, string | undefined>>`, e.g. `process.env`) and returns a [neverthrow](https://github.com/supermacro/neverthrow) `Result<T, string>`, where the `Err` value is a human-readable issue message.
 
-| Parser                                              | Behavior when unset or empty        | Behavior when set                                            |
-| --------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------ |
-| `requireString(env, key)`                           | `Err`                               | `Ok(value)`                                                  |
-| `optionalString(env, key, defaultValue?)`           | `Ok(defaultValue)` (or `undefined`) | `Ok(value)`                                                  |
-| `requireInt(env, key, constraints?)`                | `Err`                               | `Ok(parsed)` if integer and within `constraints`, else `Err` |
-| `optionalInt(env, key, defaultValue, constraints?)` | `Ok(defaultValue)`                  | `Ok(parsed)` if integer and within `constraints`, else `Err` |
-| `requireEnum(env, key, allowed)`                    | `Err`                               | `Ok(value)` if in `allowed`, else `Err`                      |
-| `optionalEnum(env, key, allowed, defaultValue)`     | `Ok(defaultValue)`                  | `Ok(value)` if in `allowed`, else `Err`                      |
+| Parser                                              | Behavior when unset or empty                                 | Behavior when set                                            |
+| --------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `requireString(env, key)`                           | `Err`                                                        | `Ok(value)`                                                  |
+| `optionalString(env, key, defaultValue?)`           | `Ok(defaultValue)` (or `undefined`)                          | `Ok(value)`                                                  |
+| `requireInt(env, key, constraints?)`                | `Err`                                                        | `Ok(parsed)` if integer and within `constraints`, else `Err` |
+| `optionalInt(env, key, defaultValue, constraints?)` | `Ok(defaultValue)` if it satisfies `constraints`, else `Err` | `Ok(parsed)` if integer and within `constraints`, else `Err` |
+| `requireEnum(env, key, allowed)`                    | `Err`                                                        | `Ok(value)` if in `allowed`, else `Err`                      |
+| `optionalEnum(env, key, allowed, defaultValue)`     | `Ok(defaultValue)` if it is in `allowed`, else `Err`         | `Ok(value)` if in `allowed`, else `Err`                      |
 
-`constraints` is `{ min?: number; max?: number }`, checked against the parsed integer.
+`constraints` is `{ min?: number; max?: number }`, checked against the parsed integer. `optionalInt` and `optionalEnum` validate `defaultValue` the same way, so a misconfigured default fails fast instead of only surfacing once someone sets the env var explicitly.
 
 ### `parseEnv` and `EnvValidationError`
 
