@@ -160,7 +160,7 @@ The registration is unconditional: passing `--import` is itself the opt-in, so i
 
 ### Dependencies
 
-`@sentry/node`, `@sentry/opentelemetry`, and the `@opentelemetry/*` packages other than `@opentelemetry/api` are declared as regular `dependencies` — consumers get a working install without pinning every OTel/Sentry package themselves. Only `@opentelemetry/api` stays a `peerDependency` (with `peerDependenciesMeta.optional`), since the OTel API forbids multiple instances in one process: a consumer that calls the API directly (e.g. `trace.getTracer()`) must resolve the same instance the kit uses internally.
+`@sentry/node`, `@sentry/opentelemetry`, and the `@opentelemetry/*` packages other than `@opentelemetry/api` are declared as regular `dependencies` — consumers get a working install without pinning every OTel/Sentry package themselves. Only `@opentelemetry/api` stays a `peerDependency` (with `peerDependenciesMeta.optional`), since the OTel API forbids multiple instances in one process: a consumer that calls the API directly (e.g. `trace.getTracer()`) must resolve the same instance the kit uses internally. Install it explicitly, matching the peer range: `pnpm add @opentelemetry/api@^1.9.1`.
 
 ## Rust
 
