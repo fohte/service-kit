@@ -31,4 +31,3 @@ Language-agnostic conventions live under `docs/conventions/`. Each document is t
 - [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order
 - [Env conventions](./docs/conventions/env.md): fail-fast typed env var parsing with aggregated validation errors
 - [Retry conventions](./docs/conventions/retry.md): sleep + exponential-backoff retry helper, retry-predicate ownership
-  </content>
