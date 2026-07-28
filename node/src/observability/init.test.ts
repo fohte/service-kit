@@ -219,6 +219,21 @@ describe('initObservability', () => {
     expect(process.listenerCount('SIGTERM')).toBe(before)
   })
 
+  it('skips registering signal handlers when registerSignalHandlers is false, while shutdown() still works', async () => {
+    const before = process.listenerCount('SIGTERM')
+    const handle = initObservability(FULL_ENV, {
+      registerSignalHandlers: false,
+    })
+
+    expect(process.listenerCount('SIGTERM')).toBe(before)
+    expect(process.listenerCount('SIGINT')).toBe(before)
+
+    await handle.shutdown()
+
+    expect(sdkShutdown).toHaveBeenCalledTimes(1)
+    expect(sentryClose).toHaveBeenCalledTimes(1)
+  })
+
   it('wraps the failure in ObservabilityInitError, logs a warn event, and rethrows', () => {
     const logger = makeLogger()
     const boom = new Error('boom: sdk.start failed')

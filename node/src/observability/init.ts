@@ -34,6 +34,7 @@ export interface InitObservabilityOptions extends InitSentryOptions {
   readonly extraSpanProcessors?: OtelOptions['spanProcessors'] | undefined
   readonly sampler?: OtelOptions['sampler'] | undefined
   readonly shutdownTimeoutMs?: number | undefined
+  readonly registerSignalHandlers?: boolean | undefined
 }
 
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5000
@@ -80,6 +81,7 @@ export const initObservability = (
     extraSpanProcessors,
     sampler,
     shutdownTimeoutMs = DEFAULT_SHUTDOWN_TIMEOUT_MS,
+    registerSignalHandlers = true,
     ...sentryOpts
   } = options
   const otel = isOtelConfigured(env)
@@ -157,10 +159,16 @@ export const initObservability = (
       )
       return shutdownPromise
     }
-    // Use `once` (not `on`) so a second delivery after the listener has
-    // detached itself falls through to Node's default handler.
-    process.once('SIGTERM', onSignal)
-    process.once('SIGINT', onSignal)
+    // Skip when a caller composes shutdown via
+    // `@fohte/service-kit/shutdown`, which owns process signal registration
+    // for the whole service; pass `shutdown` to it as one of its steps
+    // instead of registering a second, competing SIGTERM/SIGINT listener.
+    if (registerSignalHandlers) {
+      // Use `once` (not `on`) so a second delivery after the listener has
+      // detached itself falls through to Node's default handler.
+      process.once('SIGTERM', onSignal)
+      process.once('SIGINT', onSignal)
+    }
 
     return { shutdown }
   } catch (err) {

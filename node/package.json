@@ -36,6 +36,10 @@
       "types": "./dist/retry/index.d.ts",
       "import": "./dist/retry/index.js"
     },
+    "./shutdown": {
+      "types": "./dist/shutdown/index.d.ts",
+      "import": "./dist/shutdown/index.js"
+    },
     "./package.json": "./package.json"
   },
   "imports": {
