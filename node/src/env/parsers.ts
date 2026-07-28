@@ -48,12 +48,16 @@ const checkIntConstraints = (
 ): Result<number, string> => {
   if (min !== undefined && parsed < min) {
     return err(
-      `environment variable ${key} must be >= ${String(min)} (got: ${String(parsed)})`,
+      `environment variable ${key} must be >= ${String(min)} (got: ${String(
+        parsed,
+      )})`,
     )
   }
   if (max !== undefined && parsed > max) {
     return err(
-      `environment variable ${key} must be <= ${String(max)} (got: ${String(parsed)})`,
+      `environment variable ${key} must be <= ${String(max)} (got: ${String(
+        parsed,
+      )})`,
     )
   }
   return ok(parsed)
@@ -101,7 +105,9 @@ const enumMessage = (
   allowed: readonly string[],
   raw: string,
 ): string =>
-  `environment variable ${key} must be one of ${allowed.join(', ')} (got: ${raw})`
+  `environment variable ${key} must be one of ${allowed.join(
+    ', ',
+  )} (got: ${raw})`
 
 const checkEnum = <T extends string>(
   key: string,
