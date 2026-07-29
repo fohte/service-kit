@@ -23,8 +23,12 @@ export default config(
     files: [
       'src/observability/index.ts',
       'src/observability/init.ts',
+      'src/observability/sentry.ts',
       'src/env/index.ts',
       'src/retry/index.ts',
+      'src/logger/index.ts',
+      'src/logger/logger.ts',
+      'src/logger/redact.ts',
       'src/shutdown/index.ts',
     ],
     rules: {

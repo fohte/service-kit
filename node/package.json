@@ -24,6 +24,10 @@
       "types": "./dist/env/index.d.ts",
       "import": "./dist/env/index.js"
     },
+    "./logger": {
+      "types": "./dist/logger/index.d.ts",
+      "import": "./dist/logger/index.js"
+    },
     "./observability": {
       "types": "./dist/observability/index.d.ts",
       "import": "./dist/observability/index.js"
@@ -56,10 +60,18 @@
     "test:unit": "vitest run"
   },
   "peerDependencies": {
-    "@opentelemetry/api": "^1.9.1"
+    "@opentelemetry/api": "^1.9.1",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3"
   },
   "peerDependenciesMeta": {
     "@opentelemetry/api": {
+      "optional": true
+    },
+    "pino": {
+      "optional": true
+    },
+    "pino-pretty": {
       "optional": true
     }
   },
@@ -88,6 +100,8 @@
     "@types/node": "24.13.3",
     "concurrently": "10.0.3",
     "eslint": "10.6.0",
+    "pino": "10.3.1",
+    "pino-pretty": "13.1.3",
     "prettier": "3.9.6",
     "tsc-alias": "1.8.17",
     "typescript": "6.0.3",
