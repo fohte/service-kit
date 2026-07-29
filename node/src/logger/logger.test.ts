@@ -121,6 +121,10 @@ describe('createLogger', () => {
     ])
   })
 
+  it('enables the pino-pretty transport when pretty is true and no destination is given', () => {
+    expect(() => createLogger({ pretty: true })).not.toThrow()
+  })
+
   describe('child', () => {
     it('includes redacted bindings on every log line from the child', () => {
       const stream = new BufferStream()
@@ -152,7 +156,7 @@ describe('createLogger', () => {
 })
 
 describe('noopLogger', () => {
-  it('is safe to call at every level and child() returns itself', () => {
+  it('does not throw at any level', () => {
     expect(() => {
       noopLogger.trace({}, 'a')
       noopLogger.debug({}, 'a')
@@ -161,6 +165,9 @@ describe('noopLogger', () => {
       noopLogger.error({}, 'a')
       noopLogger.fatal({}, 'a')
     }).not.toThrow()
+  })
+
+  it('child() returns itself', () => {
     expect(noopLogger.child({ foo: 'bar' })).toBe(noopLogger)
   })
 })

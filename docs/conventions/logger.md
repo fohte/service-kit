@@ -38,7 +38,7 @@ const LOG_LEVELS = [
   'error',
   'fatal',
   'silent',
-]
+] as const
 
 const logger = createLogger({
   level: optionalEnum(process.env, 'LOG_LEVEL', LOG_LEVELS, 'info').unwrapOr(

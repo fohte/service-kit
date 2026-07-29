@@ -7,10 +7,7 @@ export type LogFields = Record<string, unknown>
 export type LogLevel =
   'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'silent'
 
-// Deliberately independent of `pino.Logger`: a small, stable surface that
-// callers can implement with a fake in tests, and that this module could
-// re-implement on a different logging backend later without a breaking
-// change. Structurally compatible with `ObservabilityLogger` from
+// Structurally compatible with `ObservabilityLogger` from
 // `@fohte/service-kit/observability` (same `(payload, msg)` shape for
 // `info`/`warn`), so a logger created here can be passed straight to
 // `initObservability`'s `logger` option.
@@ -41,23 +38,32 @@ export const noopLogger: Logger = {
   child: () => noopLogger,
 }
 
+// Guarding each method with `isLevelEnabled` skips the redact walk (a
+// recursive clone of `fields`) for calls pino would drop anyway, matching
+// pino's own near-zero-cost behavior for a disabled level.
 const wrap = (instance: pino.Logger, redactOptions: RedactOptions): Logger => ({
   trace: (fields, message) => {
+    if (!instance.isLevelEnabled('trace')) return
     instance.trace(redactFields(fields, redactOptions), message)
   },
   debug: (fields, message) => {
+    if (!instance.isLevelEnabled('debug')) return
     instance.debug(redactFields(fields, redactOptions), message)
   },
   info: (fields, message) => {
+    if (!instance.isLevelEnabled('info')) return
     instance.info(redactFields(fields, redactOptions), message)
   },
   warn: (fields, message) => {
+    if (!instance.isLevelEnabled('warn')) return
     instance.warn(redactFields(fields, redactOptions), message)
   },
   error: (fields, message) => {
+    if (!instance.isLevelEnabled('error')) return
     instance.error(redactFields(fields, redactOptions), message)
   },
   fatal: (fields, message) => {
+    if (!instance.isLevelEnabled('fatal')) return
     instance.fatal(redactFields(fields, redactOptions), message)
   },
   child: (bindings) =>

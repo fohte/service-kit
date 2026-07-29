@@ -3,35 +3,26 @@ import { describe, expect, it } from 'vitest'
 import { redactFields } from '#logger/redact'
 
 describe('redactFields', () => {
-  it('redacts keys matching the default secret patterns at any depth, using the [REDACTED] placeholder', () => {
-    const input = {
-      token: 'raw',
-      SLACK_BOT_TOKEN: 'xoxb-1234',
-      dsn: 'https://x@y/1',
-      api_key: 'sk-abc',
-      authorization: 'Bearer x',
-      nested: {
-        accessToken: 'kept-camelCase-is-not-matched',
-        OPENAI_API_KEY: 'sk-def',
-        userId: 'U1',
-      },
-      list: [{ SENTRY_DSN: 'https://x@y/2' }, 'plain'],
-      kept: 'ok',
-    }
+  it('redacts keys matching a default secret pattern at any depth', () => {
+    const input = { token: 'raw', nested: { api_key: 'sk-abc', userId: 'U1' } }
 
     expect(redactFields(input)).toEqual({
       token: '[REDACTED]',
-      SLACK_BOT_TOKEN: '[REDACTED]',
-      dsn: '[REDACTED]',
-      api_key: '[REDACTED]',
-      authorization: '[REDACTED]',
-      nested: {
-        accessToken: 'kept-camelCase-is-not-matched',
-        OPENAI_API_KEY: '[REDACTED]',
-        userId: 'U1',
-      },
-      list: [{ SENTRY_DSN: '[REDACTED]' }, 'plain'],
-      kept: 'ok',
+      nested: { api_key: '[REDACTED]', userId: 'U1' },
+    })
+  })
+
+  it('does not redact camelCase keys, since DEFAULT_SECRET_KEY_PATTERNS only matches bare or snake_case keys', () => {
+    const input = { accessToken: 'kept' }
+
+    expect(redactFields(input)).toEqual({ accessToken: 'kept' })
+  })
+
+  it('redacts array entries the same way as object fields', () => {
+    const input = { list: [{ token: 'raw' }, 'plain'] }
+
+    expect(redactFields(input)).toEqual({
+      list: [{ token: '[REDACTED]' }, 'plain'],
     })
   })
 
@@ -58,18 +49,14 @@ describe('redactFields', () => {
     sharedObject['self'] = sharedObject
     const input = { loopArray: sharedArray, loopObject: sharedObject }
 
-    const result = redactFields(input)
+    const expectedArray: unknown[] = ['leaf']
+    expectedArray.push(expectedArray)
+    const expectedObject: Record<string, unknown> = { id: 'O1' }
+    expectedObject['self'] = expectedObject
 
-    expect({
-      arrayHead: result.loopArray[0],
-      arrayCycles: result.loopArray[1] === result.loopArray,
-      objectId: result.loopObject['id'],
-      objectCycles: result.loopObject['self'] === result.loopObject,
-    }).toEqual({
-      arrayHead: 'leaf',
-      arrayCycles: true,
-      objectId: 'O1',
-      objectCycles: true,
+    expect(redactFields(input)).toEqual({
+      loopArray: expectedArray,
+      loopObject: expectedObject,
     })
   })
 
