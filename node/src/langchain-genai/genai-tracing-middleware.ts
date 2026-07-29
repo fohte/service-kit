@@ -23,6 +23,7 @@ import {
   GEN_AI_OPERATION_NAME_VALUE_CHAT,
 } from '@opentelemetry/semantic-conventions/incubating'
 import { createMiddleware } from 'langchain'
+import { Result } from 'neverthrow'
 
 // Mirrors the env var used by other OpenTelemetry GenAI instrumentations
 // (e.g. opentelemetry-instrumentation-openai-v2, Elastic's EDOT Node.js SDK)
@@ -105,6 +106,20 @@ const contentToGenAiParts = (
     if (isRecord(block) && block['type'] === 'text' && 'text' in block) {
       const text = block['text']
       return { type: 'text', content: typeof text === 'string' ? text : '' }
+    }
+    // @langchain/core's standard content block union includes a `reasoning`
+    // block (distinct from the `additional_kwargs.reasoning_content` field
+    // some provider integrations use instead — see reasoningPartsOf below).
+    if (
+      isRecord(block) &&
+      block['type'] === 'reasoning' &&
+      'reasoning' in block
+    ) {
+      const text = block['reasoning']
+      return {
+        type: 'reasoning',
+        content: typeof text === 'string' ? text : '',
+      }
     }
     const blockType =
       isRecord(block) && typeof block['type'] === 'string'
@@ -257,60 +272,67 @@ export const createGenAiTracingMiddleware = (
         [ATTR_GEN_AI_REQUEST_MODEL]: requestModel,
       })
       if (captureMessageContent) {
-        // eslint-disable-next-line no-restricted-syntax -- boundary: input-message capture must not fail the model call itself; a serialization error is recorded on the span and swallowed
-        try {
-          // request.systemMessage is a separate field from request.messages
-          // (createAgent's systemPrompt/systemMessage option), but it's
-          // still the first message actually sent to the model.
-          const systemMessage =
-            request.systemMessage.text.length > 0
-              ? [messageToGenAiMessage(request.systemMessage)]
-              : []
-          const inputMessages = [
-            ...systemMessage,
-            ...request.messages.map(messageToGenAiMessage),
-          ]
-          span.setAttribute(
-            ATTR_GEN_AI_INPUT_MESSAGES,
-            JSON.stringify(inputMessages),
-          )
-        } catch (error) {
-          recordSpanException(span, error)
-        }
+        // Result.fromThrowable, not try/catch: a serialization error here
+        // must not fail the model call itself, only be recorded on the span.
+        const buildInputMessagesJson = Result.fromThrowable(
+          (): string => {
+            // request.systemMessage is a separate field from
+            // request.messages (createAgent's systemPrompt/systemMessage
+            // option), but it's still the first message actually sent to
+            // the model.
+            const systemMessage =
+              request.systemMessage.text.length > 0
+                ? [messageToGenAiMessage(request.systemMessage)]
+                : []
+            return JSON.stringify([
+              ...systemMessage,
+              ...request.messages.map(messageToGenAiMessage),
+            ])
+          },
+          (error) => error,
+        )
+        buildInputMessagesJson().match(
+          (json) => {
+            span.setAttribute(ATTR_GEN_AI_INPUT_MESSAGES, json)
+          },
+          (error) => {
+            recordSpanException(span, error)
+          },
+        )
       }
 
       const spanContext = trace.setSpan(context.active(), span)
       // eslint-disable-next-line no-restricted-syntax -- boundary: wraps LangChain's throw-based wrapModelCall handler contract; finally guarantees span.end() runs even when the model call throws
       try {
         const response = await context.with(spanContext, () => handler(request))
-        // eslint-disable-next-line no-restricted-syntax -- boundary: response-attribute capture must not fail the model call itself; a serialization error is recorded on the span and swallowed
-        try {
-          const responseModel = responseMetadataString(response, 'model_name')
-          if (responseModel !== undefined) {
-            span.setAttribute(ATTR_GEN_AI_RESPONSE_MODEL, responseModel)
-          }
-          const usage = usageTokensOf(response)
-          if (usage !== undefined) {
-            span.setAttribute(ATTR_GEN_AI_USAGE_INPUT_TOKENS, usage.inputTokens)
-            span.setAttribute(
-              ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
-              usage.outputTokens,
-            )
-          }
-          const finishReason = responseMetadataString(response, 'finish_reason')
-          if (finishReason !== undefined) {
-            span.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [
-              finishReason,
-            ])
-          }
-          if (captureMessageContent) {
-            span.setAttribute(
-              ATTR_GEN_AI_OUTPUT_MESSAGES,
-              JSON.stringify(outputMessagesOf(response)),
-            )
-          }
-        } catch (error) {
-          recordSpanException(span, error)
+        const responseModel = responseMetadataString(response, 'model_name')
+        if (responseModel !== undefined) {
+          span.setAttribute(ATTR_GEN_AI_RESPONSE_MODEL, responseModel)
+        }
+        const usage = usageTokensOf(response)
+        if (usage !== undefined) {
+          span.setAttribute(ATTR_GEN_AI_USAGE_INPUT_TOKENS, usage.inputTokens)
+          span.setAttribute(ATTR_GEN_AI_USAGE_OUTPUT_TOKENS, usage.outputTokens)
+        }
+        const finishReason = responseMetadataString(response, 'finish_reason')
+        if (finishReason !== undefined) {
+          span.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [finishReason])
+        }
+        if (captureMessageContent) {
+          // Result.fromThrowable, not try/catch: a serialization error here
+          // must not fail the model call itself, only be recorded on the span.
+          const buildOutputMessagesJson = Result.fromThrowable(
+            (): string => JSON.stringify(outputMessagesOf(response)),
+            (error) => error,
+          )
+          buildOutputMessagesJson().match(
+            (json) => {
+              span.setAttribute(ATTR_GEN_AI_OUTPUT_MESSAGES, json)
+            },
+            (error) => {
+              recordSpanException(span, error)
+            },
+          )
         }
         return response
       } catch (error) {
