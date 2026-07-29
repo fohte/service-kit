@@ -219,6 +219,50 @@ describe('initObservability', () => {
     expect(process.listenerCount('SIGTERM')).toBe(before)
   })
 
+  it('does not register signal handlers when registerSignalHandlers is false', () => {
+    const before = {
+      sigterm: process.listenerCount('SIGTERM'),
+      sigint: process.listenerCount('SIGINT'),
+    }
+
+    initObservability(FULL_ENV, { registerSignalHandlers: false })
+
+    expect({
+      sigterm: process.listenerCount('SIGTERM'),
+      sigint: process.listenerCount('SIGINT'),
+    }).toEqual(before)
+  })
+
+  it('still flushes both SDKs via shutdown() when registerSignalHandlers is false', async () => {
+    const handle = initObservability(FULL_ENV, {
+      registerSignalHandlers: false,
+    })
+
+    await handle.shutdown()
+
+    expect(sdkShutdown).toHaveBeenCalledTimes(1)
+    expect(sentryClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not produce an unhandled rejection when a signal-triggered shutdown fails', async () => {
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    sdkShutdown.mockRejectedValueOnce(new Error('flush failed'))
+    const logger = makeLogger()
+    logger.warn.mockImplementationOnce(() => {
+      throw new Error('logger boom')
+    })
+    initObservability(FULL_ENV, { logger })
+
+    const unhandled = vi.fn()
+    process.once('unhandledRejection', unhandled)
+    process.emit('SIGTERM', 'SIGTERM')
+    await new Promise((resolve) => setImmediate(resolve))
+    process.off('unhandledRejection', unhandled)
+    killSpy.mockRestore()
+
+    expect(unhandled).not.toHaveBeenCalled()
+  })
+
   it('wraps the failure in ObservabilityInitError, logs a warn event, and rethrows', () => {
     const logger = makeLogger()
     const boom = new Error('boom: sdk.start failed')

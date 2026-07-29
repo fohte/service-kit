@@ -25,6 +25,7 @@ export default config(
       'src/observability/init.ts',
       'src/env/index.ts',
       'src/retry/index.ts',
+      'src/shutdown/index.ts',
     ],
     rules: {
       'no-restricted-imports': 'off',

@@ -101,6 +101,8 @@ const observability = initObservability(process.env, {
 // to wire them. Call `observability.shutdown()` directly for non-signal exits.
 ```
 
+Pass `registerSignalHandlers: false` when composing shutdown through `@fohte/service-kit/shutdown` instead, so the service has a single SIGTERM/SIGINT owner — see [Shutdown conventions](./shutdown.md#composing-with-observability).
+
 `initObservabilityIfConfigured(env, options?)` wraps the `isObservabilityConfigured(env) ? initObservability(env, options) : undefined` guard that a service's bootstrap file otherwise repeats, as a single call:
 
 ```ts
@@ -116,23 +118,24 @@ initObservabilityIfConfigured(process.env)
 3. If Sentry is configured, initialize Sentry first so its global hooks are in place before OTel starts.
 4. If OTel is configured, build `NodeSDK` with an OTLP trace exporter and, when a metrics endpoint resolves, an OTLP `PeriodicExportingMetricReader`. When Sentry is also enabled, register `SentryPropagator` and `SentryContextManager`. Call `start()`.
 5. If both SDKs are enabled, call `Sentry.validateOpenTelemetrySetup()` to confirm the wiring.
-6. Register per-instance SIGTERM / SIGINT handlers that flush both SDKs and re-deliver the signal so Node's default termination still runs. The listeners detach themselves on first `shutdown()` call so a subsequent `initObservability` in the same process re-registers fresh handlers.
+6. Unless `registerSignalHandlers` is `false`, register per-instance SIGTERM / SIGINT handlers that flush both SDKs and re-deliver the signal so Node's default termination still runs. The listeners detach themselves on first `shutdown()` call so a subsequent `initObservability` in the same process re-registers fresh handlers.
 7. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])`.
 8. If initialization throws after a partial start, log an `observability_init_failed` warn event, kick off a best-effort flush of whichever SDK had already started, and re-throw so the caller fails fast.
 
 ### Options
 
-| Option                   | Type                                            | Purpose                                                                               |
-| ------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `logger`                 | `{ info(payload, msg); warn(payload, msg) }`    | Logger to record init / shutdown events. Defaults to a no-op.                         |
-| `defaultServiceName`     | `string`                                        | Fallback `service.name` used when neither env var carries one.                        |
-| `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (see Redact patterns above). |
-| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters.         |
-| `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                               |
-| `sampler`                | `Sampler`                                       | Override the OTel sampler. Defaults to the SDK's standard sampler.                    |
-| `extraIgnoreErrors`      | `Array<string \| RegExp>`                       | Additional `ignoreErrors` patterns forwarded to Sentry on top of the noise defaults.  |
-| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).                   |
-| `shutdownTimeoutMs`      | `number`                                        | Per-SDK timeout passed to `Sentry.close`. Defaults to 5000 ms.                        |
+| Option                   | Type                                            | Purpose                                                                                                                                                               |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logger`                 | `{ info(payload, msg); warn(payload, msg) }`    | Logger to record init / shutdown events. Defaults to a no-op.                                                                                                         |
+| `defaultServiceName`     | `string`                                        | Fallback `service.name` used when neither env var carries one.                                                                                                        |
+| `extraSecretKeyPatterns` | `RegExp[]`                                      | Additional key patterns to redact on top of the defaults (see Redact patterns above).                                                                                 |
+| `extraStringTruncators`  | `Array<{ pattern: RegExp; maxLength: number }>` | Truncate string values whose key matches `pattern` to `maxLength` characters.                                                                                         |
+| `extraSpanProcessors`    | `SpanProcessor[]`                               | Additional span processors to register on the OTel SDK.                                                                                                               |
+| `sampler`                | `Sampler`                                       | Override the OTel sampler. Defaults to the SDK's standard sampler.                                                                                                    |
+| `extraIgnoreErrors`      | `Array<string \| RegExp>`                       | Additional `ignoreErrors` patterns forwarded to Sentry on top of the noise defaults.                                                                                  |
+| `sentryOptions`          | `Partial<Sentry.NodeOptions>`                   | Extra options forwarded to `Sentry.init` (e.g. `tracesSampleRate`).                                                                                                   |
+| `shutdownTimeoutMs`      | `number`                                        | Per-SDK timeout passed to `Sentry.close`. Defaults to 5000 ms.                                                                                                        |
+| `registerSignalHandlers` | `boolean`                                       | Whether to register `initObservability`'s own SIGTERM/SIGINT handlers. Defaults to `true`; set `false` when composing shutdown through `@fohte/service-kit/shutdown`. |
 
 A service-specific rule such as "truncate the body of a chat message to 200 characters" is expressible through options alone, without modifying the library:
 
