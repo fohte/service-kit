@@ -2,6 +2,7 @@ import {
   AIMessage,
   HumanMessage,
   SystemMessage,
+  ToolMessage,
 } from '@langchain/core/messages'
 import type { Attributes } from '@opentelemetry/api'
 import { context, SpanStatusCode, trace } from '@opentelemetry/api'
@@ -82,11 +83,20 @@ const fakeRequest = (
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately partial: only the fields wrapModelCall actually reads (see comment above)
   ({ model, messages, systemMessage }) as unknown as FakeRequest
 
+const defaultMiddleware = (): WrapModelCall =>
+  wrapModelCallOf(createGenAiTracingMiddleware({ providerName: 'opencode' }))
+
+const capturingMiddleware = (): WrapModelCall =>
+  wrapModelCallOf(
+    createGenAiTracingMiddleware({
+      providerName: 'opencode',
+      captureMessageContent: true,
+    }),
+  )
+
 describe('createGenAiTracingMiddleware', () => {
   it('records a CLIENT span with GenAI attributes on success', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({ providerName: 'opencode' }),
-    )
+    const wrapModelCall = defaultMiddleware()
     const aiMessage = new AIMessage({
       content: 'hello there',
       response_metadata: {
@@ -126,9 +136,7 @@ describe('createGenAiTracingMiddleware', () => {
   })
 
   it('falls back to "unknown" for the request model when request.model has no model field', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({ providerName: 'opencode' }),
-    )
+    const wrapModelCall = defaultMiddleware()
 
     await wrapModelCall(fakeRequest({}, [new HumanMessage('hi')]), () =>
       Promise.resolve(new AIMessage('ok')),
@@ -148,9 +156,7 @@ describe('createGenAiTracingMiddleware', () => {
   })
 
   it("returns the handler's response unchanged", async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({ providerName: 'opencode' }),
-    )
+    const wrapModelCall = defaultMiddleware()
     const aiMessage = new AIMessage('hello there')
 
     const response = await wrapModelCall(
@@ -165,9 +171,7 @@ describe('createGenAiTracingMiddleware', () => {
   // duration, so any span the handler creates (e.g. undici's HTTP span)
   // nests under it as a child.
   it("runs the handler inside the span's active context, so a span created during the call becomes its child", async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({ providerName: 'opencode' }),
-    )
+    const wrapModelCall = defaultMiddleware()
 
     await wrapModelCall(
       fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
@@ -180,15 +184,18 @@ describe('createGenAiTracingMiddleware', () => {
     const spans = spanExporter.getFinishedSpans()
     const chatSpan = spans.find((s) => s.name === 'chat opencode-go/gpt-5')
     const httpSpan = spans.find((s) => s.name === 'POST')
-    expect(httpSpan?.parentSpanContext?.spanId).toBe(
-      chatSpan?.spanContext().spanId,
+    if (chatSpan === undefined || httpSpan === undefined) {
+      throw new Error(
+        'expected both the chat span and the HTTP span to be recorded',
+      )
+    }
+    expect(httpSpan.parentSpanContext?.spanId).toBe(
+      chatSpan.spanContext().spanId,
     )
   })
 
   it('rethrows the error the handler throws', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({ providerName: 'opencode' }),
-    )
+    const wrapModelCall = defaultMiddleware()
     const error = new Error('go usage limit')
 
     await expect(
@@ -202,9 +209,7 @@ describe('createGenAiTracingMiddleware', () => {
   })
 
   it('records an ERROR span when the handler fails', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({ providerName: 'opencode' }),
-    )
+    const wrapModelCall = defaultMiddleware()
 
     try {
       await wrapModelCall(
@@ -231,9 +236,7 @@ describe('createGenAiTracingMiddleware', () => {
   })
 
   it('omits message content by default', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({ providerName: 'opencode' }),
-    )
+    const wrapModelCall = defaultMiddleware()
 
     await wrapModelCall(
       fakeRequest({ model: 'opencode-go/gpt-5' }, [
@@ -257,12 +260,7 @@ describe('createGenAiTracingMiddleware', () => {
   })
 
   it('captures redacted message content when opted in', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({
-        providerName: 'opencode',
-        captureMessageContent: true,
-      }),
-    )
+    const wrapModelCall = capturingMiddleware()
 
     await wrapModelCall(
       fakeRequest({ model: 'opencode-go/gpt-5' }, [
@@ -335,12 +333,7 @@ describe('createGenAiTracingMiddleware', () => {
   ])(
     'request.systemMessage: $scenario',
     async ({ systemMessage, inputMessages }) => {
-      const wrapModelCall = wrapModelCallOf(
-        createGenAiTracingMiddleware({
-          providerName: 'opencode',
-          captureMessageContent: true,
-        }),
-      )
+      const wrapModelCall = capturingMiddleware()
 
       await wrapModelCall(
         fakeRequest(
@@ -370,12 +363,7 @@ describe('createGenAiTracingMiddleware', () => {
   )
 
   it('includes additional_kwargs.reasoning_content as a leading reasoning part in gen_ai.output.messages', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({
-        providerName: 'opencode',
-        captureMessageContent: true,
-      }),
-    )
+    const wrapModelCall = capturingMiddleware()
     const aiMessage = new AIMessage({
       content: 'final answer',
       additional_kwargs: { reasoning_content: 'thinking it through' },
@@ -411,13 +399,134 @@ describe('createGenAiTracingMiddleware', () => {
     ])
   })
 
-  it('captures a bare string element inside a content array as text', async () => {
-    const wrapModelCall = wrapModelCallOf(
-      createGenAiTracingMiddleware({
-        providerName: 'opencode',
-        captureMessageContent: true,
-      }),
+  it('captures a standard reasoning content block as a leading reasoning part in gen_ai.output.messages', async () => {
+    const wrapModelCall = capturingMiddleware()
+    const aiMessage = new AIMessage({
+      content: [
+        { type: 'reasoning', reasoning: 'thinking it through' },
+        { type: 'text', text: 'final answer' },
+      ],
+    })
+
+    await wrapModelCall(
+      fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
+      () => Promise.resolve(aiMessage),
     )
+
+    expect(await collectSpans()).toEqual([
+      {
+        name: 'chat opencode-go/gpt-5',
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'opencode',
+          'gen_ai.request.model': 'opencode-go/gpt-5',
+          'gen_ai.input.messages': JSON.stringify([
+            { role: 'user', parts: [{ type: 'text', content: 'hi' }] },
+          ]),
+          'gen_ai.output.messages': JSON.stringify([
+            {
+              role: 'assistant',
+              parts: [
+                { type: 'reasoning', content: 'thinking it through' },
+                { type: 'text', content: 'final answer' },
+              ],
+            },
+          ]),
+        },
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ])
+  })
+
+  it('includes tool_calls as tool_call parts in gen_ai.output.messages', async () => {
+    const wrapModelCall = capturingMiddleware()
+    const aiMessage = new AIMessage({
+      content: '',
+      tool_calls: [
+        { id: 'call_1', name: 'get_weather', args: { city: 'Tokyo' } },
+      ],
+    })
+
+    await wrapModelCall(
+      fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
+      () => Promise.resolve(aiMessage),
+    )
+
+    expect(await collectSpans()).toEqual([
+      {
+        name: 'chat opencode-go/gpt-5',
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'opencode',
+          'gen_ai.request.model': 'opencode-go/gpt-5',
+          'gen_ai.input.messages': JSON.stringify([
+            { role: 'user', parts: [{ type: 'text', content: 'hi' }] },
+          ]),
+          'gen_ai.output.messages': JSON.stringify([
+            {
+              role: 'assistant',
+              parts: [
+                {
+                  type: 'tool_call',
+                  id: 'call_1',
+                  name: 'get_weather',
+                  arguments: { city: 'Tokyo' },
+                },
+              ],
+            },
+          ]),
+        },
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ])
+  })
+
+  it('captures a ToolMessage in request.messages as a tool_call_response part with role "tool"', async () => {
+    const wrapModelCall = capturingMiddleware()
+    const toolMessage = new ToolMessage({
+      content: '{"temperature":21}',
+      tool_call_id: 'call_1',
+    })
+
+    await wrapModelCall(
+      fakeRequest({ model: 'opencode-go/gpt-5' }, [
+        new HumanMessage('hi'),
+        toolMessage,
+      ]),
+      () => Promise.resolve(new AIMessage('ok')),
+    )
+
+    expect(await collectSpans()).toEqual([
+      {
+        name: 'chat opencode-go/gpt-5',
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'opencode',
+          'gen_ai.request.model': 'opencode-go/gpt-5',
+          'gen_ai.input.messages': JSON.stringify([
+            { role: 'user', parts: [{ type: 'text', content: 'hi' }] },
+            {
+              role: 'tool',
+              parts: [
+                {
+                  type: 'tool_call_response',
+                  id: 'call_1',
+                  response: '{"temperature":21}',
+                },
+              ],
+            },
+          ]),
+          'gen_ai.output.messages': JSON.stringify([
+            { role: 'assistant', parts: [{ type: 'text', content: 'ok' }] },
+          ]),
+        },
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ])
+  })
+
+  it('captures a bare string element inside a content array as text', async () => {
+    const wrapModelCall = capturingMiddleware()
     // BaseMessage['content'] is typed as string | ContentBlock[], but
     // @langchain/core's own BaseMessage#text getter defensively handles a
     // bare string inside that array too, so upstream message sources can
