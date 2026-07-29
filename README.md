@@ -6,7 +6,7 @@
 
 Everything in this repository must be universal enough that any service repository should include it, regardless of what the service does. The [observability conventions](./docs/conventions/observability.md) are the reference example of this bar.
 
-Cross-language parity (implemented for the Node package and the Rust crate alike) is a goal, not a prerequisite: a module may land in the Node package first and gain a Rust implementation later. Anything that only makes sense for a specific kind of service (e.g. a webhook-receiver toolkit) belongs in its own package, not here.
+Cross-language parity (implemented for the Node package and the Rust crate alike) is a goal, not a prerequisite: a module may land in the Node package first and gain a Rust implementation later. Anything that only makes sense for a specific kind of service (e.g. a webhook-receiver toolkit) belongs in its own package, not here. A module scoped to a specific framework (e.g. `langchain-genai`, which requires LangChain) is still in scope as long as it implements a standard shared across services that use that framework — e.g. OpenTelemetry's GenAI semantic conventions — rather than one service's own business logic.
 
 ## Packages
 
@@ -19,14 +19,15 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 
 #### Node (`@fohte/service-kit`)
 
-| Module          | Provides                                                                           |
-| --------------- | ---------------------------------------------------------------------------------- |
-| `env`           | Fail-fast typed env var parsing with aggregated validation errors                  |
-| `logger`        | Leveled structured logging with secret redaction and dev-mode pretty printing      |
-| `observability` | OTel + Sentry setup shared across services                                         |
-| `otel-register` | ESM loader hook registration for `node --import`, so OTel can patch Node built-ins |
-| `retry`         | Sleep + exponential-backoff retry helper                                           |
-| `shutdown`      | Ordered SIGTERM/SIGINT cleanup steps (drain, close server, ...) plus process exit  |
+| Module            | Provides                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| `env`             | Fail-fast typed env var parsing with aggregated validation errors                  |
+| `langchain-genai` | OTel GenAI semantic-convention tracing middleware for LangChain agent model calls  |
+| `logger`          | Leveled structured logging with secret redaction and dev-mode pretty printing      |
+| `observability`   | OTel + Sentry setup shared across services                                         |
+| `otel-register`   | ESM loader hook registration for `node --import`, so OTel can patch Node built-ins |
+| `retry`           | Sleep + exponential-backoff retry helper                                           |
+| `shutdown`        | Ordered SIGTERM/SIGINT cleanup steps (drain, close server, ...) plus process exit  |
 
 #### Rust (`fohte-service-kit`)
 
@@ -40,6 +41,7 @@ Language-agnostic conventions live under `docs/conventions/`. Each document is t
 
 - [Observability conventions](./docs/conventions/observability.md): OTel + Sentry layout, environment variables, redact rules, startup / shutdown order, Rust structured logging
 - [Env conventions](./docs/conventions/env.md): fail-fast typed env var parsing with aggregated validation errors
+- [LangChain GenAI conventions](./docs/conventions/langchain-genai.md): `wrapModelCall` agent middleware capturing system prompt, tool calls, reasoning content, and opt-in message-content capture
 - [Logger conventions](./docs/conventions/logger.md): leveled structured logging, shared redact patterns, implementation-independent `Logger` interface
 - [Retry conventions](./docs/conventions/retry.md): sleep + exponential-backoff retry helper, retry-predicate ownership
 - [Shutdown conventions](./docs/conventions/shutdown.md): ordered graceful-shutdown steps, composition with `observability`

@@ -1,7 +1,11 @@
 import { config } from '@fohte/eslint-config'
 
 export default config(
-  { typescript: { typeChecked: true }, errorHandling: {} },
+  {
+    typescript: { typeChecked: true },
+    errorHandling: {},
+    opentelemetry: { enabled: true },
+  },
   { ignores: ['dist'] },
   {
     rules: {
@@ -25,6 +29,7 @@ export default config(
       'src/observability/init.ts',
       'src/observability/sentry.ts',
       'src/env/index.ts',
+      'src/langchain-genai/index.ts',
       'src/retry/index.ts',
       'src/logger/index.ts',
       'src/logger/logger.ts',
