@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.6](https://github.com/fohte/service-kit/compare/node-v0.1.5...node-v0.1.6) (2026-07-29)
+
+
+### Features
+
+* **node/env:** add env parser with aggregated validation errors ([#56](https://github.com/fohte/service-kit/issues/56)) ([2c352c4](https://github.com/fohte/service-kit/commit/2c352c4a4eb78a336950b0671716c55b244b4a61))
+* **node/logger:** add logger with redaction ([#68](https://github.com/fohte/service-kit/issues/68)) ([eee6b83](https://github.com/fohte/service-kit/commit/eee6b83a443317a054377814259fd1e46d3c0e09))
+* **node/retry:** add backoff retry helper ([#59](https://github.com/fohte/service-kit/issues/59)) ([ea1c57d](https://github.com/fohte/service-kit/commit/ea1c57db7eeeebdb27c470c152486ef6049166b0))
+* **node/shutdown:** add a graceful shutdown handler ([#66](https://github.com/fohte/service-kit/issues/66)) ([7a02aca](https://github.com/fohte/service-kit/commit/7a02aca036918b25d8b5559caac389ee493bb205))
+* **node:** add otel-register entry and bootstrap helper ([#62](https://github.com/fohte/service-kit/issues/62)) ([a23b80c](https://github.com/fohte/service-kit/commit/a23b80cbf07b7b83179fbf7daa71a4f47f81455f))
+
+
+### Bug Fixes
+
+* **node:** move OTel/Sentry packages to dependencies ([#67](https://github.com/fohte/service-kit/issues/67)) ([9517786](https://github.com/fohte/service-kit/commit/9517786eeab86360c343b42334e8078588082f32))
+
 ## [0.1.5](https://github.com/fohte/service-kit/compare/node-v0.1.4...node-v0.1.5) (2026-07-27)
 
 
