@@ -29,6 +29,7 @@ export default config(
       'src/logger/index.ts',
       'src/logger/logger.ts',
       'src/logger/redact.ts',
+      'src/shutdown/index.ts',
     ],
     rules: {
       'no-restricted-imports': 'off',
