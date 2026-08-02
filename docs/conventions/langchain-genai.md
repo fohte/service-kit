@@ -8,11 +8,15 @@ Conventions for the LangChain agent tracing layer of `@fohte/service-kit` (Node)
 
 ### Middleware, not a callback handler
 
-`createGenAiTracingMiddleware` is a LangChain agent middleware (a `wrapModelCall` hook), not a callback handler. Wrapping the model call itself keeps the span active in context for the call's duration, so any span created during the call (e.g. an HTTP instrumentation span for the underlying fetch) nests under it as a child rather than landing as an unrelated sibling — a callback handler's separate start/end hooks can't provide that nesting.
+`createGenAiTracingMiddleware` is a LangChain agent middleware (`wrapModelCall` and `wrapToolCall` hooks), not a callback handler. Wrapping the model/tool call itself keeps the span active in context for the call's duration, so any span created during the call (e.g. an HTTP instrumentation span for the underlying fetch) nests under it as a child rather than landing as an unrelated sibling — a callback handler's separate start/end hooks can't provide that nesting.
+
+### One `execute_tool` span per tool call
+
+`wrapToolCall` starts one INTERNAL span per tool invocation (name: `execute_tool {gen_ai.tool.name}`, per the GenAI semantic conventions' span-naming rule), distinct from `wrapModelCall`'s CLIENT chat span because tool execution runs in-process rather than calling out to the GenAI provider. This gives per-tool-call nodes in observability backends that infer an agent graph from span parent/child relationships (e.g. Langfuse's Agent Graph), which a `tool_call` part embedded inside a chat span's `gen_ai.output.messages` can't provide on its own. The chat span's `tool_call` / `tool_call_response` parts are kept regardless — the GenAI semantic conventions define both the message parts and the `execute_tool` span, and Langfuse's Agent Graph needs the latter, not a replacement for the former.
 
 ### Message content capture is opt-in
 
-`gen_ai.input.messages` / `gen_ai.output.messages` may contain PII, so they're only recorded when explicitly enabled (`captureMessageContent: true` or `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`), mirroring the opt-in capture convention of other OpenTelemetry GenAI instrumentations. Every other `gen_ai.*` attribute (model, provider, usage, finish reason) is always recorded.
+`gen_ai.input.messages` / `gen_ai.output.messages` (on the chat span) and `gen_ai.tool.call.arguments` / `gen_ai.tool.call.result` (on the `execute_tool` span) may contain PII, so they're only recorded when explicitly enabled (`captureMessageContent: true` or `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`), mirroring the opt-in capture convention of other OpenTelemetry GenAI instrumentations. Every other `gen_ai.*` attribute (model, provider, usage, finish reason, tool name/type/id/description) is always recorded.
 
 ### System prompt and reasoning content live outside `request.messages` / `message.content`
 
@@ -35,6 +39,8 @@ const agent = createAgent({
 ```
 
 `createGenAiTracingMiddleware(options)` returns a LangChain agent middleware whose `wrapModelCall` hook starts one CLIENT span per model inference call (name: `chat {model}`, following the GenAI semantic conventions' `{gen_ai.operation.name} {gen_ai.request.model}` span-naming rule), records `gen_ai.*` attributes (operation name, provider, request/response model, usage tokens, finish reason), sets the span to `ERROR` status and records the exception if the call throws, and always ends the span.
+
+Its `wrapToolCall` hook starts one INTERNAL span per tool call (name: `execute_tool {tool name}`), records `gen_ai.*` attributes (operation name, tool name, tool type, and — when available — tool call id and tool description), sets the span to `ERROR` status if the call throws (recording the exception) or if the handler returns a `ToolMessage` with `status: 'error'`, and always ends the span. A handler-returned `Command` is passed through without inspection: attaching a result to the span isn't supported for that return type.
 
 ### Options
 
