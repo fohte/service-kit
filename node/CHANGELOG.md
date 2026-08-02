@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/fohte/service-kit/compare/node-v0.1.6...node-v0.1.7) (2026-08-02)
+
+
+### Features
+
+* **node/langchain-genai:** add execute_tool span ([#71](https://github.com/fohte/service-kit/issues/71)) ([aa6e905](https://github.com/fohte/service-kit/commit/aa6e9055870cf252b808944f3bc3223a30d3bc4c))
+* **node/langchain-genai:** add GenAI tracing middleware ([#69](https://github.com/fohte/service-kit/issues/69)) ([ca5dba9](https://github.com/fohte/service-kit/commit/ca5dba96fc024237d30292cab260791d4ee64e55))
+
 ## [0.1.6](https://github.com/fohte/service-kit/compare/node-v0.1.5...node-v0.1.6) (2026-07-29)
 
 
