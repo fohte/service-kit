@@ -42,6 +42,30 @@ const agent = createAgent({
 
 Its `wrapToolCall` hook starts one INTERNAL span per tool call (name: `execute_tool {tool name}`), records `gen_ai.*` attributes (operation name, tool name, tool type, and — when available — tool call id and tool description), sets the span to `ERROR` status if the call throws (recording the exception) or if the handler returns a `ToolMessage` with `status: 'error'`, and always ends the span. A handler-returned `Command` is passed through without inspection: attaching a result to the span isn't supported for that return type.
 
+### Registering this middleware disables `ToolNode`'s tool-error recovery
+
+LangChain's `ToolNode` (the tool-execution node `createAgent` builds internally) normally catches a thrown tool error and converts it into an error `ToolMessage`, letting the agent turn continue so the model can see the error and retry. That conversion stops applying, though, once _any_ middleware in `createAgent`'s `middleware` array defines a `wrapToolCall` hook — this one does. `ToolNode` then attributes a caught error to middleware, and `createAgent` gives no way to opt back into automatic recovery for middleware-attributed errors, so the error is re-thrown instead of converted — failing the whole agent turn. So adding `createGenAiTracingMiddleware` to `middleware` is enough, on its own, to turn every tool call that can throw (e.g. a delegation tool or an MCP tool making a network call) from recoverable into turn-failing.
+
+This is a LangChain-level effect of registering any `wrapToolCall` middleware, not something specific to tracing, and recovering from a tool error is a separate responsibility from tracing it (see "Middleware, not a callback handler" above) — so this middleware does not work around it. Add LangChain's own `toolErrorMiddleware` to the `middleware` array to restore the recovery behavior. **This requires `langchain` >= 1.5.4**: this package's `langchain` peer dependency (`^1.5.0`) also allows earlier 1.5.x releases that don't export `toolErrorMiddleware`, so confirm your installed version — and bump it if needed — before relying on this fix:
+
+```ts
+import { createAgent, toolErrorMiddleware } from 'langchain'
+import { createGenAiTracingMiddleware } from '@fohte/service-kit/langchain-genai'
+
+const agent = createAgent({
+  model,
+  middleware: [
+    createGenAiTracingMiddleware({ providerName: 'openai' }),
+    toolErrorMiddleware({
+      onError: (error) =>
+        `${error instanceof Error ? error.message : String(error)}\n Please fix your mistakes.`,
+    }),
+  ],
+})
+```
+
+Order matters: LangChain composes `wrapToolCall` hooks with the first middleware in the array as the outermost layer, so `createGenAiTracingMiddleware` must come before `toolErrorMiddleware` for its `wrapToolCall` to see the `ToolMessage` (`status: 'error'`) that `toolErrorMiddleware` converts the thrown error into, and report it as `ERROR` on the `execute_tool` span per the behavior described above.
+
 ### Options
 
 | Option                  | Type                                            | Purpose                                                                                   |
