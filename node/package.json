@@ -13,7 +13,7 @@
     "url": "https://github.com/fohte/service-kit.git",
     "directory": "node"
   },
-  "packageManager": "pnpm@11.15.1",
+  "packageManager": "pnpm@11.16.0",
   "type": "module",
   "files": [
     "dist",
@@ -103,7 +103,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.1",
-    "@eslint/eslintrc": "3.3.5",
+    "@eslint/eslintrc": "3.3.6",
     "@fohte/eslint-config": "0.4.0",
     "@langchain/core": "1.2.3",
     "@ninoseki/eslint-plugin-neverthrow": "0.2.0",
