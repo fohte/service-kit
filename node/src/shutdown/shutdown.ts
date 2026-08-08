@@ -1,6 +1,6 @@
 import { ResultAsync } from 'neverthrow'
 
-import { ownSignals } from '#signal-owner'
+import { ownSignals } from '../signal-owner'
 
 export interface ShutdownStep {
   readonly name: string
