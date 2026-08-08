@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/fohte/service-kit/compare/node-v0.1.7...node-v0.1.8) (2026-08-08)
+
+
+### Bug Fixes
+
+* **node/shutdown:** fix import unresolved in the published package ([#74](https://github.com/fohte/service-kit/issues/74)) ([9cfde4c](https://github.com/fohte/service-kit/commit/9cfde4c27c75d98f5999f06a24b83d24909a1f9c))
+
 ## [0.1.7](https://github.com/fohte/service-kit/compare/node-v0.1.6...node-v0.1.7) (2026-08-02)
 
 
