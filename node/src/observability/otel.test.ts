@@ -2,6 +2,7 @@ import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { describe, expect, it } from 'vitest'
 
 import {
+  createInstrumentations,
   createMetricReader,
   createNodeSdk,
   isOtelConfigured,
@@ -168,6 +169,18 @@ describe('createMetricReader', () => {
         OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example',
       }),
     ).toBeInstanceOf(PeriodicExportingMetricReader)
+  })
+})
+
+describe('createInstrumentations', () => {
+  it('excludes the openai instrumentation', () => {
+    const names = createInstrumentations().map((i) => i.instrumentationName)
+    expect(names).not.toContain('@opentelemetry/instrumentation-openai')
+  })
+
+  it('still includes other auto instrumentations', () => {
+    const names = createInstrumentations().map((i) => i.instrumentationName)
+    expect(names).toContain('@opentelemetry/instrumentation-http')
   })
 })
 
