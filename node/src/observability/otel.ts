@@ -2,6 +2,7 @@ import type { ContextManager, TextMapPropagator } from '@opentelemetry/api'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
+import type { Instrumentation } from '@opentelemetry/instrumentation'
 import type { Resource } from '@opentelemetry/resources'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
@@ -168,6 +169,16 @@ export const createMetricReader = (
   })
 }
 
+// `@opentelemetry/instrumentation-openai` records request/response bodies
+// only via OTel Logs, not span attributes. No logs exporter is configured,
+// so every GENERATION it emits has an empty body and is recorded as a
+// duplicate in Langfuse. Disabled here so it's off for every consumer by
+// default.
+export const createInstrumentations = (): Instrumentation[] =>
+  getNodeAutoInstrumentations({
+    '@opentelemetry/instrumentation-openai': { enabled: false },
+  })
+
 export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   const {
     env,
@@ -198,7 +209,7 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   }
   const traceExporter = createOtlpTraceExporter(env)
   const resource = buildResource(env, serviceName)
-  const instrumentations = getNodeAutoInstrumentations()
+  const instrumentations = createInstrumentations()
   // NodeSDK's `spanProcessors` option replaces the default
   // BatchSpanProcessor(traceExporter) instead of appending to it, so prepend
   // it manually whenever the caller wires in extra processors.
