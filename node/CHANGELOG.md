@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/fohte/service-kit/compare/node-v0.1.8...node-v0.1.9) (2026-08-09)
+
+
+### Bug Fixes
+
+* **node/observability:** disable the openai auto-instrumentation ([#76](https://github.com/fohte/service-kit/issues/76)) ([8bfc732](https://github.com/fohte/service-kit/commit/8bfc732774027a2ff9c37bddd32ecb3685ca6252))
+
 ## [0.1.8](https://github.com/fohte/service-kit/compare/node-v0.1.7...node-v0.1.8) (2026-08-08)
 
 
