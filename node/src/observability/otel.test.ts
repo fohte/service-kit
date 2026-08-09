@@ -175,12 +175,12 @@ describe('createMetricReader', () => {
 describe('createInstrumentations', () => {
   it('excludes the openai instrumentation', () => {
     const names = createInstrumentations().map((i) => i.instrumentationName)
-    expect(names).not.toContain('@opentelemetry/instrumentation-openai')
+    expect(names.includes('@opentelemetry/instrumentation-openai')).toBe(false)
   })
 
   it('still includes other auto instrumentations', () => {
     const names = createInstrumentations().map((i) => i.instrumentationName)
-    expect(names).toContain('@opentelemetry/instrumentation-http')
+    expect(names.includes('@opentelemetry/instrumentation-http')).toBe(true)
   })
 })
 

@@ -122,6 +122,8 @@ initObservabilityIfConfigured(process.env)
 7. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])`.
 8. If initialization throws after a partial start, log an `observability_init_failed` warn event, kick off a best-effort flush of whichever SDK had already started, and re-throw so the caller fails fast.
 
+`createNodeSdk` disables `@opentelemetry/instrumentation-openai` in the auto-instrumentation set unconditionally. It records request/response bodies only via OTel Logs, and since `initObservability` does not configure a logs exporter, every GENERATION it emits carries an empty body and shows up as a duplicate in Langfuse.
+
 ### Options
 
 | Option                   | Type                                            | Purpose                                                                                                                                                               |

@@ -172,8 +172,8 @@ export const createMetricReader = (
 // `@opentelemetry/instrumentation-openai` records request/response bodies
 // only via OTel Logs, not span attributes. No logs exporter is configured,
 // so every GENERATION it emits has an empty body and is recorded as a
-// duplicate in Langfuse. Disabled here (rather than per-app env) so it's off
-// for every consumer by default.
+// duplicate in Langfuse. Disabled here so it's off for every consumer by
+// default.
 export const createInstrumentations = (): Instrumentation[] =>
   getNodeAutoInstrumentations({
     '@opentelemetry/instrumentation-openai': { enabled: false },
