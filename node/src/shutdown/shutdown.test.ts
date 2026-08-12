@@ -40,30 +40,23 @@ describe('createShutdownHandler', () => {
 
     await handle.shutdown('SIGTERM')
 
-    expect({
-      order,
-      exitCalls: exit.mock.calls,
-      infoCalls: logger.info.mock.calls,
-      warnCalls: logger.warn.mock.calls,
-    }).toEqual({
-      order: ['drain', 'close-server'],
-      exitCalls: [[0]],
-      infoCalls: [
-        [
-          {
-            event: 'shutdown_initiated',
-            signal: 'SIGTERM',
-            steps: ['drain', 'close-server'],
-          },
-          'shutdown signal received; running shutdown steps',
-        ],
-        [
-          { event: 'shutdown_completed', signal: 'SIGTERM', hadError: false },
-          'shutdown steps complete; exiting',
-        ],
+    expect(order).toEqual(['drain', 'close-server'])
+    expect(exit.mock.calls).toEqual([[0]])
+    expect(logger.info.mock.calls).toEqual([
+      [
+        {
+          event: 'shutdown_initiated',
+          signal: 'SIGTERM',
+          steps: ['drain', 'close-server'],
+        },
+        'shutdown signal received; running shutdown steps',
       ],
-      warnCalls: [],
-    })
+      [
+        { event: 'shutdown_completed', signal: 'SIGTERM', hadError: false },
+        'shutdown steps complete; exiting',
+      ],
+    ])
+    expect(logger.warn.mock.calls).toEqual([])
   })
 
   it('continues past a failing step and reports a partially failed shutdown', async () => {
@@ -86,39 +79,32 @@ describe('createShutdownHandler', () => {
 
     await handle.shutdown('SIGTERM')
 
-    expect({
-      order,
-      exitCalls: exit.mock.calls,
-      infoCalls: logger.info.mock.calls,
-      warnCalls: logger.warn.mock.calls,
-    }).toEqual({
-      order: ['close-server'],
-      exitCalls: [[1]],
-      infoCalls: [
-        [
-          {
-            event: 'shutdown_initiated',
-            signal: 'SIGTERM',
-            steps: ['drain', 'close-server'],
-          },
-          'shutdown signal received; running shutdown steps',
-        ],
-        [
-          { event: 'shutdown_completed', signal: 'SIGTERM', hadError: true },
-          'shutdown steps complete; exiting',
-        ],
+    expect(order).toEqual(['close-server'])
+    expect(exit.mock.calls).toEqual([[1]])
+    expect(logger.info.mock.calls).toEqual([
+      [
+        {
+          event: 'shutdown_initiated',
+          signal: 'SIGTERM',
+          steps: ['drain', 'close-server'],
+        },
+        'shutdown signal received; running shutdown steps',
       ],
-      warnCalls: [
-        [
-          {
-            event: 'shutdown_step_failed',
-            step: 'drain',
-            error: 'drain failed',
-          },
-          'shutdown step failed',
-        ],
+      [
+        { event: 'shutdown_completed', signal: 'SIGTERM', hadError: true },
+        'shutdown steps complete; exiting',
       ],
-    })
+    ])
+    expect(logger.warn.mock.calls).toEqual([
+      [
+        {
+          event: 'shutdown_step_failed',
+          step: 'drain',
+          error: 'drain failed',
+        },
+        'shutdown step failed',
+      ],
+    ])
   })
 
   it('runs the underlying steps only once across repeated calls', async () => {
@@ -158,22 +144,17 @@ describe('createShutdownHandler', () => {
         expect(exit).toHaveBeenCalledTimes(1)
       })
 
-      expect({
-        exitCalls: exit.mock.calls,
-        infoCalls: logger.info.mock.calls,
-      }).toEqual({
-        exitCalls: [[0]],
-        infoCalls: [
-          [
-            { event: 'shutdown_initiated', signal, steps: [] },
-            'shutdown signal received; running shutdown steps',
-          ],
-          [
-            { event: 'shutdown_completed', signal, hadError: false },
-            'shutdown steps complete; exiting',
-          ],
+      expect(exit.mock.calls).toEqual([[0]])
+      expect(logger.info.mock.calls).toEqual([
+        [
+          { event: 'shutdown_initiated', signal, steps: [] },
+          'shutdown signal received; running shutdown steps',
         ],
-      })
+        [
+          { event: 'shutdown_completed', signal, hadError: false },
+          'shutdown steps complete; exiting',
+        ],
+      ])
     },
   )
 

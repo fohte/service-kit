@@ -16,10 +16,8 @@ describe('ownSignals', () => {
 
     ownSignals(() => {})
 
-    expect({
-      sigterm: process.listenerCount('SIGTERM'),
-      sigint: process.listenerCount('SIGINT'),
-    }).toEqual({ sigterm: before.sigterm + 1, sigint: before.sigint + 1 })
+    expect(process.listenerCount('SIGTERM')).toBe(before.sigterm + 1)
+    expect(process.listenerCount('SIGINT')).toBe(before.sigint + 1)
   })
 
   it('removes both listeners when detach is called', () => {
@@ -31,10 +29,8 @@ describe('ownSignals', () => {
 
     detach()
 
-    expect({
-      sigterm: process.listenerCount('SIGTERM'),
-      sigint: process.listenerCount('SIGINT'),
-    }).toEqual(before)
+    expect(process.listenerCount('SIGTERM')).toBe(before.sigterm)
+    expect(process.listenerCount('SIGINT')).toBe(before.sigint)
   })
 
   it('invokes the handler with the delivered signal', () => {

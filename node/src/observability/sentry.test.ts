@@ -10,18 +10,13 @@ const { initSentry, isSentryConfigured, redactEvent } =
   await import('#observability/sentry')
 
 describe('isSentryConfigured', () => {
-  it('returns based on SENTRY_DSN presence', () => {
-    expect({
-      withDsn: isSentryConfigured({ SENTRY_DSN: 'https://x@y/1' }),
-      emptyDsn: isSentryConfigured({ SENTRY_DSN: '' }),
-      blankDsn: isSentryConfigured({ SENTRY_DSN: '   ' }),
-      missing: isSentryConfigured({}),
-    }).toEqual({
-      withDsn: true,
-      emptyDsn: false,
-      blankDsn: false,
-      missing: false,
-    })
+  it.each([
+    { name: 'a DSN', env: { SENTRY_DSN: 'https://x@y/1' }, expected: true },
+    { name: 'an empty DSN', env: { SENTRY_DSN: '' }, expected: false },
+    { name: 'a blank DSN', env: { SENTRY_DSN: '   ' }, expected: false },
+    { name: 'no DSN', env: {}, expected: false },
+  ])('returns $expected given $name', ({ env, expected }) => {
+    expect(isSentryConfigured(env)).toBe(expected)
   })
 })
 
@@ -245,18 +240,16 @@ describe('redactEvent', () => {
       },
     }
 
-    const result = redactEvent(input)
+    const expectedArray: unknown[] = ['leaf']
+    expectedArray.push(expectedArray)
+    const expectedObject: Record<string, unknown> = { id: 'O1' }
+    expectedObject['self'] = expectedObject
 
-    expect({
-      arrayHead: result.extra.loopArray[0],
-      arrayCycles: result.extra.loopArray[1] === result.extra.loopArray,
-      objectId: result.extra.loopObject['id'],
-      objectCycles: result.extra.loopObject['self'] === result.extra.loopObject,
-    }).toEqual({
-      arrayHead: 'leaf',
-      arrayCycles: true,
-      objectId: 'O1',
-      objectCycles: true,
+    expect(redactEvent(input)).toEqual({
+      extra: {
+        loopArray: expectedArray,
+        loopObject: expectedObject,
+      },
     })
   })
 

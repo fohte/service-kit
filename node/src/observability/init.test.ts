@@ -227,10 +227,8 @@ describe('initObservability', () => {
 
     initObservability(FULL_ENV, { registerSignalHandlers: false })
 
-    expect({
-      sigterm: process.listenerCount('SIGTERM'),
-      sigint: process.listenerCount('SIGINT'),
-    }).toEqual(before)
+    expect(process.listenerCount('SIGTERM')).toBe(before.sigterm)
+    expect(process.listenerCount('SIGINT')).toBe(before.sigint)
   })
 
   it('still flushes both SDKs via shutdown() when registerSignalHandlers is false', async () => {
@@ -282,15 +280,9 @@ describe('initObservability', () => {
         'expected initObservability to throw ObservabilityInitError',
       )
     }
-    expect({
-      name: thrown.name,
-      message: thrown.message,
-      cause: thrown.cause,
-    }).toEqual({
-      name: 'ObservabilityInitError',
-      message: 'failed to initialize observability',
-      cause: boom,
-    })
+    expect(thrown).toEqual(
+      new ObservabilityInitError('failed to initialize observability', boom),
+    )
     expect(sentryValidate).not.toHaveBeenCalled()
     expect(logger.info).not.toHaveBeenCalled()
     expect(logger.warn.mock.calls).toEqual([

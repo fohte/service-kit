@@ -1,4 +1,10 @@
-import { errAsync, okAsync, type Result, type ResultAsync } from 'neverthrow'
+import {
+  err,
+  errAsync,
+  okAsync,
+  type Result,
+  type ResultAsync,
+} from 'neverthrow'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { retry, type RetryOptions, sleep } from '#retry/retry'
@@ -121,9 +127,7 @@ describe('retry', () => {
     await vi.runAllTimersAsync()
     const result: Result<string, string> = await resultPromise
 
-    expect({
-      result: result.isOk() ? result.value : result.error,
-      fnCalls: fn.mock.calls.length,
-    }).toEqual({ result: 'fail', fnCalls: 2 })
+    expect(result).toEqual(err('fail'))
+    expect(fn.mock.calls.length).toBe(2)
   })
 })
