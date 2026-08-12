@@ -2,16 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { OtelOptions } from '#observability/otel'
 
-// Stub @sentry/node and @sentry/opentelemetry: the real SDKs install global
-// instrumentation hooks on import that we don't want to run inside the test
-// process. Stubbing also lets us observe the call sequence (initSentry →
-// sdk.start → validateOpenTelemetrySetup).
+// Stub @sentry/node: the real SDK installs global instrumentation hooks on
+// import that we don't want to run inside the test process. Stubbing also
+// lets us observe the call sequence (initSentry → sdk.start →
+// validateOpenTelemetrySetup).
 const {
   sentryInit,
   sentryClose,
   sentryValidate,
   FakeSentryContextManager,
-  FakeSentryPropagator,
   sdkStart,
   sdkShutdown,
   createNodeSdkMock,
@@ -21,9 +20,6 @@ const {
   sentryValidate: vi.fn(),
   FakeSentryContextManager: class {
     readonly _kind = 'SentryContextManager' as const
-  },
-  FakeSentryPropagator: class {
-    readonly _kind = 'SentryPropagator' as const
   },
   sdkStart: vi.fn<() => void>(),
   sdkShutdown: vi.fn<() => Promise<void>>(),
@@ -40,10 +36,6 @@ vi.mock('@sentry/node', () => ({
   close: sentryClose,
   validateOpenTelemetrySetup: sentryValidate,
   SentryContextManager: FakeSentryContextManager,
-}))
-
-vi.mock('@sentry/opentelemetry', () => ({
-  SentryPropagator: FakeSentryPropagator,
 }))
 
 vi.mock('#observability/otel', async () => {
@@ -110,8 +102,14 @@ describe('initObservability', () => {
     expect(sentryValidate).toHaveBeenCalledTimes(1)
 
     const sdkOptions = createNodeSdkMock.mock.calls[0]?.[0]
-    expect(sdkOptions?.propagator).toBeInstanceOf(FakeSentryPropagator)
-    expect(sdkOptions?.contextManager).toBeInstanceOf(FakeSentryContextManager)
+    expect({
+      propagator: sdkOptions?.propagator,
+      isContextManager:
+        sdkOptions?.contextManager instanceof FakeSentryContextManager,
+    }).toEqual({
+      propagator: undefined,
+      isContextManager: true,
+    })
 
     const callOrder = [
       sentryInit.mock.invocationCallOrder[0],
