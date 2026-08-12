@@ -11,7 +11,7 @@ Conventions for the observability layer shared by `@fohte/service-kit` (Node) an
 - Span / metric / log: send via the OpenTelemetry SDK to an OTLP-compatible backend.
 - Error event: send to Sentry (via `Sentry.captureException`, or by letting the Sentry SDK pick up unhandled exceptions).
 - Do not double-send spans to Sentry. Specifically, do not register `SentrySpanProcessor` or `SentrySampler`.
-- The Sentry SDK is wired into OpenTelemetry only for trace-context propagation (register `SentryPropagator` and `SentryContextManager` on the OTel SDK).
+- The Sentry SDK is wired into OpenTelemetry only to keep Sentry's scope in sync with the OTel context (register `SentryContextManager` on the OTel SDK). Trace-context propagation always uses OTel's default W3C propagator — never `SentryPropagator`, whose `extract()` only understands the `sentry-trace` header and silently drops an incoming `traceparent`, breaking distributed tracing against services that don't ship spans to Sentry.
 
 This way the Sentry event quota is consumed by error events only.
 
@@ -63,7 +63,7 @@ If `service.name` is missing, the library fails fast at init.
 Initialize the observability layer in this order during service bootstrap.
 
 1. **Sentry init**: call `Sentry.init({ dsn, environment, release, ... })` first. The Sentry SDK installs global hooks that must be in place before the OTel SDK starts.
-2. **Build the OTel SDK**: construct `NodeSDK` (Node) or `opentelemetry::sdk` (Rust). Register only `SentryPropagator` and `SentryContextManager` as the Sentry integration — do not add any Sentry-derived span processor or sampler.
+2. **Build the OTel SDK**: construct `NodeSDK` (Node) or `opentelemetry::sdk` (Rust). Register only `SentryContextManager` as the Sentry integration, keeping OTel's default W3C propagator — do not add `SentryPropagator`, or any Sentry-derived span processor or sampler.
 3. **`sdk.start()`**: start the OTel SDK.
 4. **`Sentry.validateOpenTelemetrySetup()`**: run Sentry's self-diagnostic to confirm the OTel wiring matches expectations.
 
@@ -116,7 +116,7 @@ initObservabilityIfConfigured(process.env)
 1. Read `env`. Fail fast (throw) if neither Sentry nor OpenTelemetry is configured — provide dummy values in development if telemetry is intentionally disabled. Use `isObservabilityConfigured(env)` to probe the env before calling.
 2. Treat each SDK independently: only Sentry is initialized when just `SENTRY_*` is set, only OTel is started when just `OTEL_*` is set, and both run when both are set.
 3. If Sentry is configured, initialize Sentry first so its global hooks are in place before OTel starts.
-4. If OTel is configured, build `NodeSDK` with an OTLP trace exporter and, when a metrics endpoint resolves, an OTLP `PeriodicExportingMetricReader`. When Sentry is also enabled, register `SentryPropagator` and `SentryContextManager`. Call `start()`.
+4. If OTel is configured, build `NodeSDK` with an OTLP trace exporter and, when a metrics endpoint resolves, an OTLP `PeriodicExportingMetricReader`. When Sentry is also enabled, register `SentryContextManager` (the default W3C propagator stays in place regardless of Sentry). Call `start()`.
 5. If both SDKs are enabled, call `Sentry.validateOpenTelemetrySetup()` to confirm the wiring.
 6. Unless `registerSignalHandlers` is `false`, register per-instance SIGTERM / SIGINT handlers that flush both SDKs and re-deliver the signal so Node's default termination still runs. The listeners detach themselves on first `shutdown()` call so a subsequent `initObservability` in the same process re-registers fresh handlers.
 7. Return a handle with a `shutdown()` method. `shutdown()` is idempotent and runs `Promise.allSettled([sdk.shutdown(), Sentry.close(timeoutMs)])`.
@@ -165,7 +165,7 @@ The registration is unconditional: passing `--import` is itself the opt-in, so i
 
 ### Dependencies
 
-`@sentry/node`, `@sentry/opentelemetry`, and the `@opentelemetry/*` packages other than `@opentelemetry/api` are declared as regular `dependencies` — consumers get a working install without pinning every OTel/Sentry package themselves. Only `@opentelemetry/api` stays a `peerDependency` (with `peerDependenciesMeta.optional`), since the OTel API forbids multiple instances in one process: a consumer that calls the API directly (e.g. `trace.getTracer()`) must resolve the same instance the kit uses internally. Install it explicitly, matching the peer range: `pnpm add @opentelemetry/api@^1.9.1`.
+`@sentry/node` and the `@opentelemetry/*` packages other than `@opentelemetry/api` are declared as regular `dependencies` — consumers get a working install without pinning every OTel/Sentry package themselves. Only `@opentelemetry/api` stays a `peerDependency` (with `peerDependenciesMeta.optional`), since the OTel API forbids multiple instances in one process: a consumer that calls the API directly (e.g. `trace.getTracer()`) must resolve the same instance the kit uses internally. Install it explicitly, matching the peer range: `pnpm add @opentelemetry/api@^1.9.1`.
 
 ## Rust
 

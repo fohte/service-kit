@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/node'
-import { SentryPropagator } from '@sentry/opentelemetry'
 
 import { BoundaryError } from '../errors'
 import { ownSignals } from '../signal-owner'
@@ -111,21 +110,22 @@ export const initObservability = (
         ...(defaultServiceName !== undefined ? { defaultServiceName } : {}),
         ...(sampler ? { sampler } : {}),
         ...(extraSpanProcessors ? { spanProcessors: extraSpanProcessors } : {}),
-        // Fall back to the OTel defaults (W3C propagator + async-hooks
-        // context manager) when Sentry is disabled — handing OTel a
-        // `SentryPropagator` / `SentryContextManager` without a live Sentry
-        // hub would attach them to nothing and lose trace context entirely.
+        // Keep OTel's default W3C `traceparent` propagator even when Sentry
+        // is enabled: `SentryPropagator.extract()` only reads `sentry-trace`
+        // and silently drops an incoming `traceparent`, breaking distributed
+        // tracing against services that don't ship spans to Sentry.
+        // `SentryContextManager` only syncs Sentry's scope with the local
+        // OTel context (unrelated to wire propagation), so it still wires up
+        // whenever Sentry is enabled.
         ...(sentryStarted
-          ? {
-              propagator: new SentryPropagator(),
-              contextManager: new Sentry.SentryContextManager(),
-            }
+          ? { contextManager: new Sentry.SentryContextManager() }
           : {}),
       })
       otelSdk.start()
       // Run Sentry's self-diagnostic only when both SDKs are wired together,
-      // since it inspects the OTel context manager / propagator that we just
-      // installed.
+      // since it inspects the OTel context manager we just installed. It
+      // always flags the propagator as missing too, since we deliberately
+      // don't install `SentryPropagator` — expected noise.
       if (sentryStarted) {
         Sentry.validateOpenTelemetrySetup()
       }
