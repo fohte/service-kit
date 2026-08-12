@@ -103,12 +103,12 @@ describe('initObservability', () => {
 
     const sdkOptions = createNodeSdkMock.mock.calls[0]?.[0]
     expect({
-      propagator: sdkOptions?.propagator,
-      isContextManager:
+      ...sdkOptions,
+      contextManager:
         sdkOptions?.contextManager instanceof FakeSentryContextManager,
     }).toEqual({
-      propagator: undefined,
-      isContextManager: true,
+      env: FULL_ENV,
+      contextManager: true,
     })
 
     const callOrder = [
