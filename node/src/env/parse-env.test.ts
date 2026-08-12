@@ -30,11 +30,16 @@ describe('parseEnv', () => {
 describe('EnvValidationError', () => {
   it('carries the issues and formats them into the message', () => {
     const error = new EnvValidationError(['A is missing', 'B is invalid'])
+    const errorFields = () => ({
+      name: error.name,
+      message: error.message,
+      issues: error.issues,
+    })
 
-    expect(error.name).toBe('EnvValidationError')
-    expect(error.message).toBe(
-      'invalid environment:\n- A is missing\n- B is invalid',
-    )
-    expect(error.issues).toEqual(['A is missing', 'B is invalid'])
+    expect(errorFields()).toEqual({
+      name: 'EnvValidationError',
+      message: 'invalid environment:\n- A is missing\n- B is invalid',
+      issues: ['A is missing', 'B is invalid'],
+    })
   })
 })
