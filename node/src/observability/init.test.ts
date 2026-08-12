@@ -102,13 +102,9 @@ describe('initObservability', () => {
     expect(sentryValidate).toHaveBeenCalledTimes(1)
 
     const sdkOptions = createNodeSdkMock.mock.calls[0]?.[0]
-    expect({
-      ...sdkOptions,
-      contextManager:
-        sdkOptions?.contextManager instanceof FakeSentryContextManager,
-    }).toEqual({
+    expect(sdkOptions).toEqual({
       env: FULL_ENV,
-      contextManager: true,
+      contextManager: { _kind: 'SentryContextManager' },
     })
 
     const callOrder = [
