@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/fohte/service-kit/compare/node-v0.1.10...node-v0.1.11) (2026-08-13)
+
+
+### Bug Fixes
+
+* **node/observability:** stop duplicate traceparent injection ([#81](https://github.com/fohte/service-kit/issues/81)) ([a8908e2](https://github.com/fohte/service-kit/commit/a8908e241f259d58957488a6a20ca8aca76a0dcc))
+
 ## [0.1.10](https://github.com/fohte/service-kit/compare/node-v0.1.9...node-v0.1.10) (2026-08-13)
 
 
