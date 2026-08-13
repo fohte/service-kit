@@ -83,11 +83,6 @@ const makeLogger = (): MockLogger => ({
   warn: vi.fn<(payload: Record<string, unknown>, msg: string) => void>(),
 })
 
-const listenerCounts = () => ({
-  sigterm: process.listenerCount('SIGTERM'),
-  sigint: process.listenerCount('SIGINT'),
-})
-
 beforeEach(() => {
   sentryInit.mockReset().mockReturnValue({})
   sentryClose.mockReset().mockResolvedValue(true)
@@ -225,11 +220,15 @@ describe('initObservability', () => {
   })
 
   it('does not register signal handlers when registerSignalHandlers is false', () => {
-    const before = listenerCounts()
+    const before = {
+      sigterm: process.listenerCount('SIGTERM'),
+      sigint: process.listenerCount('SIGINT'),
+    }
 
     initObservability(FULL_ENV, { registerSignalHandlers: false })
 
-    expect(listenerCounts()).toEqual(before)
+    expect(process.listenerCount('SIGTERM')).toBe(before.sigterm)
+    expect(process.listenerCount('SIGINT')).toBe(before.sigint)
   })
 
   it('still flushes both SDKs via shutdown() when registerSignalHandlers is false', async () => {

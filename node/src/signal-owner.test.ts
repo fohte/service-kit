@@ -2,11 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ownSignals } from '#signal-owner'
 
-const listenerCounts = () => ({
-  sigterm: process.listenerCount('SIGTERM'),
-  sigint: process.listenerCount('SIGINT'),
-})
-
 afterEach(() => {
   process.removeAllListeners('SIGTERM')
   process.removeAllListeners('SIGINT')
@@ -14,23 +9,28 @@ afterEach(() => {
 
 describe('ownSignals', () => {
   it('registers the handler as a SIGTERM and SIGINT listener', () => {
-    const before = listenerCounts()
+    const before = {
+      sigterm: process.listenerCount('SIGTERM'),
+      sigint: process.listenerCount('SIGINT'),
+    }
 
     ownSignals(() => {})
 
-    expect(listenerCounts()).toEqual({
-      sigterm: before.sigterm + 1,
-      sigint: before.sigint + 1,
-    })
+    expect(process.listenerCount('SIGTERM')).toBe(before.sigterm + 1)
+    expect(process.listenerCount('SIGINT')).toBe(before.sigint + 1)
   })
 
   it('removes both listeners when detach is called', () => {
-    const before = listenerCounts()
+    const before = {
+      sigterm: process.listenerCount('SIGTERM'),
+      sigint: process.listenerCount('SIGINT'),
+    }
     const { detach } = ownSignals(() => {})
 
     detach()
 
-    expect(listenerCounts()).toEqual(before)
+    expect(process.listenerCount('SIGTERM')).toBe(before.sigterm)
+    expect(process.listenerCount('SIGINT')).toBe(before.sigint)
   })
 
   it('invokes the handler with the delivered signal', () => {
