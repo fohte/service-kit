@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/fohte/service-kit/compare/node-v0.1.9...node-v0.1.10) (2026-08-13)
+
+
+### Bug Fixes
+
+* **node/observability:** always use W3C trace propagation ([#78](https://github.com/fohte/service-kit/issues/78)) ([dc18fbc](https://github.com/fohte/service-kit/commit/dc18fbc44b5694392eb498cf9a246e27c452e7bc))
+
 ## [0.1.9](https://github.com/fohte/service-kit/compare/node-v0.1.8...node-v0.1.9) (2026-08-09)
 
 
