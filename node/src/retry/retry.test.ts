@@ -34,7 +34,7 @@ interface RetryCallRecord {
 
 async function runRetry<T, E>(
   fn: ReturnType<typeof vi.fn<() => ResultAsync<T, E>>>,
-  options: RetryOptions<E> & { onRetry: ReturnType<typeof vi.fn> },
+  options: RetryOptions<E> & { onRetry?: ReturnType<typeof vi.fn> },
 ): Promise<RetryCallRecord> {
   const resultPromise = retry(fn, options)
   await vi.runAllTimersAsync()
@@ -43,7 +43,7 @@ async function runRetry<T, E>(
   return {
     result: result.isOk() ? result.value : result.error,
     fnCalls: fn.mock.calls.length,
-    onRetryCalls: options.onRetry.mock.calls,
+    onRetryCalls: options.onRetry?.mock.calls ?? [],
   }
 }
 
@@ -117,13 +117,8 @@ describe('retry', () => {
   it('does not require an onRetry callback', async () => {
     const fn = vi.fn(() => errAsync('fail'))
 
-    const resultPromise = retry(fn, { maxRetries: 1, initialDelayMs: 5 })
-    await vi.runAllTimersAsync()
-    const result: Result<string, string> = await resultPromise
+    const record = await runRetry(fn, { maxRetries: 1, initialDelayMs: 5 })
 
-    expect({
-      result: result.isOk() ? result.value : result.error,
-      fnCalls: fn.mock.calls.length,
-    }).toEqual({ result: 'fail', fnCalls: 2 })
+    expect(record).toEqual({ result: 'fail', fnCalls: 2, onRetryCalls: [] })
   })
 })
