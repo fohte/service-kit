@@ -66,11 +66,13 @@ export const initSentry = (
     environment,
     release: env.SENTRY_RELEASE,
     skipOpenTelemetrySetup: true,
-    // Sentry's default `httpIntegration`/`nativeNodeFetchIntegration` run
-    // alongside OTel's own HTTP instrumentation even with
-    // `skipOpenTelemetrySetup: true`, and only inject the W3C `traceparent`
-    // header (in addition to `sentry-trace`) when this option is true.
-    propagateTraceparent: true,
+    // Leave `propagateTraceparent` at its default (false): OTel's own
+    // instrumentation already injects `traceparent`, and Sentry's
+    // `httpIntegration`/`nativeNodeFetchIntegration` run alongside it even
+    // with `skipOpenTelemetrySetup: true`. Enabling this option makes both
+    // inject `traceparent` on the same outgoing request, producing two
+    // comma-joined values that fail W3C Trace Context parsing on the
+    // receiving side.
     beforeSend: (event: ErrorEvent) => redactEvent(event, redactOptions),
     ignoreErrors: [...NOISE_PATTERNS, ...(extraIgnoreErrors ?? [])],
     ...sentryOptions,
