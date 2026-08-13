@@ -47,7 +47,7 @@ describe('initSentry', () => {
     ).toThrow(/SENTRY_ENVIRONMENT is required/)
   })
 
-  it('calls Sentry.init without propagateTraceparent, leaving W3C traceparent injection to OTel alone', () => {
+  it('calls Sentry.init with propagateTraceparent disabled, leaving W3C traceparent injection to OTel alone', () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- stub client: initSentry only checks it is not undefined
     vi.mocked(sentryInit).mockReturnValueOnce({} as unknown as NodeClient)
 
@@ -58,6 +58,7 @@ describe('initSentry', () => {
       environment: 'test',
       release: undefined,
       skipOpenTelemetrySetup: true,
+      propagateTraceparent: false,
       beforeSend: 'function',
       ignoreErrors: NOISE_PATTERNS,
     })

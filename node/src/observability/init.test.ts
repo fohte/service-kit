@@ -115,6 +115,7 @@ describe('initObservability', () => {
       environment: FULL_ENV.SENTRY_ENVIRONMENT,
       release: undefined,
       skipOpenTelemetrySetup: true,
+      propagateTraceparent: false,
       beforeSend: 'function',
       ignoreErrors: NOISE_PATTERNS,
     })
@@ -165,6 +166,7 @@ describe('initObservability', () => {
       environment: env.SENTRY_ENVIRONMENT,
       release: undefined,
       skipOpenTelemetrySetup: true,
+      propagateTraceparent: false,
       beforeSend: 'function',
       ignoreErrors: NOISE_PATTERNS,
     })
