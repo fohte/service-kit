@@ -15,7 +15,7 @@ const { NOISE_PATTERNS, initSentry, isSentryConfigured, redactEvent } =
 // equal a fixed expected value — replace it with its (stable) typeof before
 // comparing the rest of the call args with a single `toEqual`.
 const lastSentryInitCall = (): Record<string, unknown> => {
-  const options = vi.mocked(sentryInit).mock.calls[0]?.[0]
+  const options = vi.mocked(sentryInit).mock.lastCall?.[0]
   return { ...options, beforeSend: typeof options?.beforeSend }
 }
 

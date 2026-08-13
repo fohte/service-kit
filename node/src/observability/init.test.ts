@@ -81,7 +81,7 @@ const makeLogger = (): MockLogger => ({
 // equal a fixed expected value — replace it with its (stable) typeof before
 // comparing the rest of the call args with a single `toEqual`.
 const lastSentryInitCall = (): Record<string, unknown> => {
-  const options = sentryInit.mock.calls[0]?.[0]
+  const options = sentryInit.mock.lastCall?.[0]
   return { ...options, beforeSend: typeof options?.beforeSend }
 }
 
@@ -152,6 +152,22 @@ describe('initObservability', () => {
       ],
     ])
     expect(logger.warn).not.toHaveBeenCalled()
+  })
+
+  it('lets an explicit sentryOptions.propagateTraceparent override the OTel-derived default', () => {
+    initObservability(FULL_ENV, {
+      sentryOptions: { propagateTraceparent: true },
+    })
+
+    expect(lastSentryInitCall()).toEqual({
+      dsn: FULL_ENV.SENTRY_DSN,
+      environment: FULL_ENV.SENTRY_ENVIRONMENT,
+      release: undefined,
+      skipOpenTelemetrySetup: true,
+      propagateTraceparent: true,
+      beforeSend: 'function',
+      ignoreErrors: NOISE_PATTERNS,
+    })
   })
 
   it('initializes Sentry only when OTel is not configured', () => {
