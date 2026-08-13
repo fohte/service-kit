@@ -66,16 +66,17 @@ export const initSentry = (
     environment,
     release: env.SENTRY_RELEASE,
     skipOpenTelemetrySetup: true,
-    // Default to true: with no OTel undici/http instrumentation registered
-    // (Sentry used standalone), Sentry's own `SentryNodeFetchInstrumentation`
-    // is the only thing that can put a W3C `traceparent` header on outgoing
-    // requests. `initObservability` overrides this to `false` via
-    // `sentryOptions` whenever OTel is also configured, since OTel's undici
-    // instrumentation then injects `traceparent` itself — leaving this true
-    // in that case double-injects the header, and HTTP header-folding
-    // comma-joins the two values into something the receiving side's W3C
-    // parser rejects.
-    propagateTraceparent: true,
+    // Leave `propagateTraceparent` at its SDK default (false). Enabling it
+    // makes Sentry's `SentryNodeFetchInstrumentation` add its own W3C
+    // `traceparent` header — this is only useful for services that use
+    // Sentry (not OTel) as their tracing source and need that trace
+    // continued by a downstream W3C-only consumer. This org doesn't use
+    // Sentry for tracing/APM, so there's no such consumer to serve, and
+    // leaving it on alongside OTel's own undici instrumentation
+    // double-injects the header — HTTP header-folding then comma-joins the
+    // two values into something the receiving side's W3C parser rejects.
+    // Pass `sentryOptions: { propagateTraceparent: true }` to opt back in
+    // for a deployment that does need it.
     beforeSend: (event: ErrorEvent) => redactEvent(event, redactOptions),
     ignoreErrors: [...NOISE_PATTERNS, ...(extraIgnoreErrors ?? [])],
     ...sentryOptions,

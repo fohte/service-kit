@@ -100,19 +100,7 @@ export const initObservability = (
   // eslint-disable-next-line no-restricted-syntax -- best-effort cleanup before rethrowing, per initObservability's throw-based contract
   try {
     if (sentry) {
-      initSentry(env, {
-        ...sentryOpts,
-        sentryOptions: {
-          // Disable Sentry's own `traceparent` injection whenever OTel is
-          // also configured: OTel's undici/http instrumentation injects it
-          // instead, and having both enabled double-injects the header (see
-          // `initSentry`'s `propagateTraceparent` comment for the failure
-          // mode). Caller-supplied `sentryOptions.propagateTraceparent`
-          // still wins if explicitly set.
-          propagateTraceparent: !otel,
-          ...sentryOpts.sentryOptions,
-        },
-      })
+      initSentry(env, sentryOpts)
       sentryStarted = true
     }
 

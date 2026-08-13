@@ -115,9 +115,6 @@ describe('initObservability', () => {
       environment: FULL_ENV.SENTRY_ENVIRONMENT,
       release: undefined,
       skipOpenTelemetrySetup: true,
-      // OTel's own undici/http instrumentation injects `traceparent` here,
-      // so Sentry must not inject a second one.
-      propagateTraceparent: false,
       beforeSend: 'function',
       ignoreErrors: NOISE_PATTERNS,
     })
@@ -154,22 +151,6 @@ describe('initObservability', () => {
     expect(logger.warn).not.toHaveBeenCalled()
   })
 
-  it('lets an explicit sentryOptions.propagateTraceparent override the OTel-derived default', () => {
-    initObservability(FULL_ENV, {
-      sentryOptions: { propagateTraceparent: true },
-    })
-
-    expect(lastSentryInitCall()).toEqual({
-      dsn: FULL_ENV.SENTRY_DSN,
-      environment: FULL_ENV.SENTRY_ENVIRONMENT,
-      release: undefined,
-      skipOpenTelemetrySetup: true,
-      propagateTraceparent: true,
-      beforeSend: 'function',
-      ignoreErrors: NOISE_PATTERNS,
-    })
-  })
-
   it('initializes Sentry only when OTel is not configured', () => {
     const logger = makeLogger()
     const env = {
@@ -184,9 +165,6 @@ describe('initObservability', () => {
       environment: env.SENTRY_ENVIRONMENT,
       release: undefined,
       skipOpenTelemetrySetup: true,
-      // No OTel undici/http instrumentation runs in this configuration, so
-      // Sentry stays the sole source of the outgoing `traceparent`.
-      propagateTraceparent: true,
       beforeSend: 'function',
       ignoreErrors: NOISE_PATTERNS,
     })
