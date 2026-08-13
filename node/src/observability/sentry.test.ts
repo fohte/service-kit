@@ -1,3 +1,4 @@
+import type { NodeClient } from '@sentry/node'
 import { describe, expect, it, vi } from 'vitest'
 
 // Stub @sentry/node so importing this module does not load the real SDK
@@ -6,8 +7,17 @@ import { describe, expect, it, vi } from 'vitest'
 // transformations in redactEvent.
 vi.mock('@sentry/node', () => ({ init: vi.fn() }))
 
-const { initSentry, isSentryConfigured, redactEvent } =
+const { init: sentryInit } = await import('@sentry/node')
+const { NOISE_PATTERNS, initSentry, isSentryConfigured, redactEvent } =
   await import('#observability/sentry')
+
+// `beforeSend` is a fresh closure on every `initSentry` call, so it can never
+// equal a fixed expected value — replace it with its (stable) typeof before
+// comparing the rest of the call args with a single `toEqual`.
+const lastSentryInitCall = (): Record<string, unknown> => {
+  const options = vi.mocked(sentryInit).mock.calls[0]?.[0]
+  return { ...options, beforeSend: typeof options?.beforeSend }
+}
 
 describe('isSentryConfigured', () => {
   it.each([
@@ -35,6 +45,23 @@ describe('initSentry', () => {
     expect(() =>
       initSentry({ SENTRY_DSN: 'https://x@y/1', SENTRY_ENVIRONMENT: '   ' }),
     ).toThrow(/SENTRY_ENVIRONMENT is required/)
+  })
+
+  it('calls Sentry.init with propagateTraceparent enabled by default, so a standalone Sentry setup (no OTel undici/http instrumentation) still emits a W3C traceparent', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- stub client: initSentry only checks it is not undefined
+    vi.mocked(sentryInit).mockReturnValueOnce({} as unknown as NodeClient)
+
+    initSentry({ SENTRY_DSN: 'https://x@y/1', SENTRY_ENVIRONMENT: 'test' })
+
+    expect(lastSentryInitCall()).toEqual({
+      dsn: 'https://x@y/1',
+      environment: 'test',
+      release: undefined,
+      skipOpenTelemetrySetup: true,
+      propagateTraceparent: true,
+      beforeSend: 'function',
+      ignoreErrors: NOISE_PATTERNS,
+    })
   })
 })
 
