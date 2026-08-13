@@ -66,11 +66,9 @@ export const initSentry = (
     environment,
     release: env.SENTRY_RELEASE,
     skipOpenTelemetrySetup: true,
-    // Sentry's default `httpIntegration`/`nativeNodeFetchIntegration` run
-    // alongside OTel's own HTTP instrumentation even with
-    // `skipOpenTelemetrySetup: true`, and only inject the W3C `traceparent`
-    // header (in addition to `sentry-trace`) when this option is true.
-    propagateTraceparent: true,
+    // This org doesn't use Sentry for tracing/APM, so Sentry never needs to
+    // emit its own W3C traceparent.
+    propagateTraceparent: false,
     beforeSend: (event: ErrorEvent) => redactEvent(event, redactOptions),
     ignoreErrors: [...NOISE_PATTERNS, ...(extraIgnoreErrors ?? [])],
     ...sentryOptions,

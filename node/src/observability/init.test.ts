@@ -1,6 +1,8 @@
+import type { NodeClient, NodeOptions } from '@sentry/node'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { OtelOptions } from '#observability/otel'
+import { NOISE_PATTERNS } from '#observability/sentry'
 
 // Stub @sentry/node: the real SDK installs global instrumentation hooks on
 // import that we don't want to run inside the test process. Stubbing also
@@ -15,7 +17,7 @@ const {
   sdkShutdown,
   createNodeSdkMock,
 } = vi.hoisted(() => ({
-  sentryInit: vi.fn(),
+  sentryInit: vi.fn<(options: NodeOptions) => NodeClient | undefined>(),
   sentryClose: vi.fn(),
   sentryValidate: vi.fn(),
   FakeSentryContextManager: class {
@@ -75,8 +77,19 @@ const makeLogger = (): MockLogger => ({
   warn: vi.fn<(payload: Record<string, unknown>, msg: string) => void>(),
 })
 
+// `beforeSend` is a fresh closure on every `initSentry` call, so it can never
+// equal a fixed expected value — replace it with its (stable) typeof before
+// comparing the rest of the call args with a single `toEqual`.
+const lastSentryInitCall = (): Record<string, unknown> => {
+  const options = sentryInit.mock.lastCall?.[0]
+  return { ...options, beforeSend: typeof options?.beforeSend }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- stub client: initSentry only checks it is not undefined
+const stubSentryClient = {} as unknown as NodeClient
+
 beforeEach(() => {
-  sentryInit.mockReset().mockReturnValue({})
+  sentryInit.mockReset().mockReturnValue(stubSentryClient)
   sentryClose.mockReset().mockResolvedValue(true)
   sentryValidate.mockReset()
   sdkStart.mockReset()
@@ -97,6 +110,15 @@ describe('initObservability', () => {
     const handle = initObservability(FULL_ENV, { logger })
 
     expect(sentryInit).toHaveBeenCalledTimes(1)
+    expect(lastSentryInitCall()).toEqual({
+      dsn: FULL_ENV.SENTRY_DSN,
+      environment: FULL_ENV.SENTRY_ENVIRONMENT,
+      release: undefined,
+      skipOpenTelemetrySetup: true,
+      propagateTraceparent: false,
+      beforeSend: 'function',
+      ignoreErrors: NOISE_PATTERNS,
+    })
     expect(createNodeSdkMock).toHaveBeenCalledTimes(1)
     expect(sdkStart).toHaveBeenCalledTimes(1)
     expect(sentryValidate).toHaveBeenCalledTimes(1)
@@ -139,6 +161,15 @@ describe('initObservability', () => {
     const handle = initObservability(env, { logger })
 
     expect(sentryInit).toHaveBeenCalledTimes(1)
+    expect(lastSentryInitCall()).toEqual({
+      dsn: env.SENTRY_DSN,
+      environment: env.SENTRY_ENVIRONMENT,
+      release: undefined,
+      skipOpenTelemetrySetup: true,
+      propagateTraceparent: false,
+      beforeSend: 'function',
+      ignoreErrors: NOISE_PATTERNS,
+    })
     expect(createNodeSdkMock).not.toHaveBeenCalled()
     expect(sdkStart).not.toHaveBeenCalled()
     expect(sentryValidate).not.toHaveBeenCalled()
