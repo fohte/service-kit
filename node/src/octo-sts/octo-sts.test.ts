@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 
+import type { Result } from 'neverthrow'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createOctoStsTokenCache, OctoStsError } from '#octo-sts/octo-sts'
@@ -20,6 +21,25 @@ const jsonResponse = (body: unknown, status = 200) => ({
   status,
   text: () => Promise.resolve(JSON.stringify(body)),
 })
+
+// `cause` wraps an underlying exception (JSON.parse, protobuf-es, URL) whose
+// exact message isn't part of this module's contract, so it's normalized to
+// a placeholder to keep this a single whole-output equality check instead of
+// asserting only on `message`.
+const expectOctoStsError = (
+  result: Result<string, OctoStsError>,
+  message: string,
+  hasCause = false,
+) => {
+  const error = result._unsafeUnwrapErr()
+  const normalized = new OctoStsError(
+    error.message,
+    error.cause === undefined ? undefined : '<cause>',
+  )
+  expect(normalized).toEqual(
+    new OctoStsError(message, hasCause ? '<cause>' : undefined),
+  )
+}
 
 describe('createOctoStsTokenCache', () => {
   beforeEach(() => {
@@ -103,9 +123,18 @@ describe('createOctoStsTokenCache', () => {
 
     const result = await createOctoStsTokenCache(config).getToken()
 
-    expect(result._unsafeUnwrapErr()).toEqual(
-      new OctoStsError(`SA token at ${config.saTokenPath} is empty`, undefined),
-    )
+    expectOctoStsError(result, `SA token at ${config.saTokenPath} is empty`)
+  })
+
+  it('returns an error when the configured url is not a valid URL', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+
+    const result = await createOctoStsTokenCache({
+      ...config,
+      url: 'not-a-url',
+    }).getToken()
+
+    expectOctoStsError(result, 'invalid octo-sts url: not-a-url', true)
   })
 
   it('returns an error when the exchange request fails with a non-2xx status', async () => {
@@ -116,9 +145,7 @@ describe('createOctoStsTokenCache', () => {
 
     const result = await createOctoStsTokenCache(config).getToken()
 
-    expect(result._unsafeUnwrapErr()).toEqual(
-      new OctoStsError('octo-sts exchange failed: HTTP 401', undefined),
-    )
+    expectOctoStsError(result, 'octo-sts exchange failed: HTTP 401')
   })
 
   it('treats a missing token field as an empty string, per proto3 field presence', async () => {
@@ -148,9 +175,11 @@ describe('createOctoStsTokenCache', () => {
 
     const result = await createOctoStsTokenCache(config).getToken()
 
-    const error = result._unsafeUnwrapErr()
-    expect(error).toBeInstanceOf(OctoStsError)
-    expect(error.message).toBe('octo-sts exchange returned malformed body')
+    expectOctoStsError(
+      result,
+      'octo-sts exchange returned malformed body',
+      true,
+    )
   })
 
   it('returns an error when expiry is not a valid RFC 3339 timestamp', async () => {
@@ -165,9 +194,11 @@ describe('createOctoStsTokenCache', () => {
 
     const result = await createOctoStsTokenCache(config).getToken()
 
-    const error = result._unsafeUnwrapErr()
-    expect(error).toBeInstanceOf(OctoStsError)
-    expect(error.message).toBe('octo-sts exchange returned malformed body')
+    expectOctoStsError(
+      result,
+      'octo-sts exchange returned malformed body',
+      true,
+    )
   })
 
   it('falls back to the token JWT exp claim when expiry is absent, and caches using it', async () => {
@@ -189,57 +220,38 @@ describe('createOctoStsTokenCache', () => {
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 
-  it('returns an error when expiry is absent and the token is not a decodable JWT', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(jsonResponse({ token: 'ghs_abc', expiry: null })),
-    )
+  it.each([
+    {
+      name: 'is not a decodable JWT',
+      token: 'ghs_abc',
+      segments: 1,
+    },
+    {
+      name: 'has JWT shape but an undecodable payload',
+      // 2nd segment "not-json" is valid base64url but not valid JSON once decoded
+      token: 'eyJhbGciOiJub25lIn0.bm90LWpzb24.sig', // gitleaks:allow
+      segments: 3,
+    },
+    {
+      name: 'has a JWT payload with no numeric exp claim',
+      // header: {"alg":"none"}, payload: {"iat":1767225600} (no exp claim)
+      token: 'eyJhbGciOiJub25lIn0.eyJpYXQiOjE3NjcyMjU2MDB9.sig', // gitleaks:allow
+      segments: 3,
+    },
+  ])(
+    'returns an error when expiry is absent and the token $name',
+    async ({ token, segments }) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(jsonResponse({ token, expiry: null })),
+      )
 
-    const result = await createOctoStsTokenCache(config).getToken()
+      const result = await createOctoStsTokenCache(config).getToken()
 
-    expect(result._unsafeUnwrapErr()).toEqual(
-      new OctoStsError(
-        'octo-sts exchange returned no usable expiry (token segments: 1)',
-        undefined,
-      ),
-    )
-  })
-
-  it('returns an error when expiry is absent and the token has JWT shape but an undecodable payload', async () => {
-    // 2nd segment "not-json" is valid base64url but not valid JSON once decoded
-    const jwt = 'eyJhbGciOiJub25lIn0.bm90LWpzb24.sig'
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ token: jwt, expiry: null })),
-    )
-
-    const result = await createOctoStsTokenCache(config).getToken()
-
-    expect(result._unsafeUnwrapErr()).toEqual(
-      new OctoStsError(
-        'octo-sts exchange returned no usable expiry (token segments: 3)',
-        undefined,
-      ),
-    )
-  })
-
-  it('returns an error when expiry is absent and the token JWT payload has no numeric exp claim', async () => {
-    // header: {"alg":"none"}, payload: {"iat":1767225600} (no exp claim)
-    const jwt = 'eyJhbGciOiJub25lIn0.eyJpYXQiOjE3NjcyMjU2MDB9.sig'
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ token: jwt, expiry: null })),
-    )
-
-    const result = await createOctoStsTokenCache(config).getToken()
-
-    expect(result._unsafeUnwrapErr()).toEqual(
-      new OctoStsError(
-        'octo-sts exchange returned no usable expiry (token segments: 3)',
-        undefined,
-      ),
-    )
-  })
+      expectOctoStsError(
+        result,
+        `octo-sts exchange returned no usable expiry (token segments: ${String(segments)})`,
+      )
+    },
+  )
 })

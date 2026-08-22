@@ -89,17 +89,26 @@ export const createOctoStsTokenCache = (
             ),
           )
         }
-        const url = new URL('/sts/exchange', config.url)
-        url.searchParams.set('scope', config.scope)
-        url.searchParams.set('identity', config.identity)
-        return ResultAsync.fromPromise(
-          fetch(url.toString(), {
-            headers: {
-              authorization: `Bearer ${saToken}`,
-              accept: 'application/json',
-            },
-          }),
-          (cause) => new OctoStsError('octo-sts exchange network error', cause),
+        return Result.fromThrowable(
+          () => {
+            const url = new URL('/sts/exchange', config.url)
+            url.searchParams.set('scope', config.scope)
+            url.searchParams.set('identity', config.identity)
+            return url
+          },
+          (cause) =>
+            new OctoStsError(`invalid octo-sts url: ${config.url}`, cause),
+        )().asyncAndThen((url) =>
+          ResultAsync.fromPromise(
+            fetch(url.toString(), {
+              headers: {
+                authorization: `Bearer ${saToken}`,
+                accept: 'application/json',
+              },
+            }),
+            (cause) =>
+              new OctoStsError('octo-sts exchange network error', cause),
+          ),
         )
       })
       .andThen((res) => {
