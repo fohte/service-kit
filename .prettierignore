@@ -1,5 +1,6 @@
 # Auto-generated files
 CHANGELOG.md
+node/src/octo-sts/gen
 
 # Lock files
 pnpm-lock.yaml

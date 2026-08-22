@@ -5,4 +5,13 @@
     'github>fohte/renovate-config:node.json5',
     'github>fohte/renovate-config:rust.json5',
   ],
+  customManagers: [
+    {
+      customType: 'regex',
+      managerFilePatterns: ['/^scripts/vendor-octo-sts-proto$/'],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+OCTO_STS_VERSION=(?<currentValue>\\S+)',
+      ],
+    },
+  ],
 }

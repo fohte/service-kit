@@ -1,0 +1,2 @@
+node/src/octo-sts/proto/**/*.proto linguist-generated=true
+node/src/octo-sts/gen/** linguist-generated=true

@@ -36,6 +36,10 @@
       "types": "./dist/observability/index.d.ts",
       "import": "./dist/observability/index.js"
     },
+    "./octo-sts": {
+      "types": "./dist/octo-sts/index.d.ts",
+      "import": "./dist/octo-sts/index.js"
+    },
     "./otel-register": {
       "types": "./dist/otel-register.d.ts",
       "import": "./dist/otel-register.js"
@@ -55,6 +59,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths && ! grep -rn \"from '#\" dist",
+    "generate": "cd src/octo-sts/proto && buf generate",
     "lint": "eslint .",
     "format:eslint": "eslint --fix .",
     "format:prettier": "prettier --write .",
@@ -88,6 +93,7 @@
     }
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.14.0",
     "@opentelemetry/auto-instrumentations-node": "0.77.0",
     "@opentelemetry/exporter-metrics-otlp-proto": "0.219.0",
     "@opentelemetry/exporter-trace-otlp-proto": "0.219.0",
@@ -101,6 +107,8 @@
     "neverthrow": "8.2.0"
   },
   "devDependencies": {
+    "@bufbuild/buf": "1.72.0",
+    "@bufbuild/protoc-gen-es": "2.14.0",
     "@commitlint/cli": "21.2.1",
     "@eslint/eslintrc": "3.3.6",
     "@fohte/eslint-config": "0.4.1",
