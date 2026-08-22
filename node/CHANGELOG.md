@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.12](https://github.com/fohte/service-kit/compare/node-v0.1.11...node-v0.1.12) (2026-08-22)
+
+
+### Features
+
+* **node/octo-sts:** add octo-sts client generated from proto ([#84](https://github.com/fohte/service-kit/issues/84)) ([2e6b8e8](https://github.com/fohte/service-kit/commit/2e6b8e8479938acd93df642c98e375aa28c4e26f))
+
 ## [0.1.11](https://github.com/fohte/service-kit/compare/node-v0.1.10...node-v0.1.11) (2026-08-13)
 
 
