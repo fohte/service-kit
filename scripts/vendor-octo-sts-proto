@@ -28,4 +28,4 @@ sdk_version="$(
 
 curl -sSfL \
   "https://raw.githubusercontent.com/chainguard-dev/sdk/${sdk_version}/proto/platform/oidc/v1/oidc.platform.proto" \
-  -o proto/platform/oidc/v1/oidc.platform.proto
+  -o node/src/octo-sts/proto/platform/oidc/v1/oidc.platform.proto
