@@ -6,7 +6,7 @@ export default config(
     errorHandling: {},
     opentelemetry: { enabled: true },
   },
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'src/octo-sts/gen'] },
   {
     // This package publishes only `dist` (see package.json "files"), so a `#`
     // subpath import surviving into the compiled output would resolve via
@@ -21,6 +21,8 @@ export default config(
       'src/observability/sentry.ts',
       'src/env/index.ts',
       'src/langchain-genai/index.ts',
+      'src/octo-sts/index.ts',
+      'src/octo-sts/octo-sts.ts',
       'src/retry/index.ts',
       'src/logger/index.ts',
       'src/logger/logger.ts',

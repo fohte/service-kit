@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   test:
+    needs: detect-changes
     runs-on: ubuntu-latest
     env:
       SCCACHE_GHA_ENABLED: 'true'
@@ -87,6 +88,16 @@ jobs:
       - name: Fetch cargo dependencies (rust)
         run: cd "rust" && cargo fetch
 
+      # Only runs when the octo-sts/app pin in scripts/vendor-octo-sts-proto
+      # changed (e.g. a Renovate PR). The result rides the commit-action step
+      # below instead of a separate push, so only one job ever pushes to this
+      # branch.
+      - name: Regenerate octo-sts proto vendor
+        if: needs.detect-changes.outputs.octo-sts-proto == 'true'
+        run: |
+          scripts/vendor-octo-sts-proto
+          cd node && pnpm run generate
+
       - name: Run lefthook
         id: lefthook
         continue-on-error: true
@@ -122,6 +133,7 @@ jobs:
       node: ${{ steps.changes-node.outputs.any_changed }}
       rust: ${{ steps.changes-rust.outputs.any_changed }}
       workflow: ${{ steps.changes-workflow.outputs.any_changed }}
+      octo-sts-proto: ${{ steps.changes-octo-sts-proto.outputs.any_changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -138,6 +150,12 @@ jobs:
         id: changes-rust
         with:
           files: rust/**
+
+      - name: Check for octo-sts proto vendor script changes
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        id: changes-octo-sts-proto
+        with:
+          files: scripts/vendor-octo-sts-proto
 
       - name: Check for workflow changes
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
