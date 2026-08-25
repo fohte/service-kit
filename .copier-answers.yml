@@ -9,7 +9,7 @@ is_public: true
 monorepo_node_workspace: false
 project_name: service-kit
 release_type: node
-repo_id: ''
+repo_id: '1277092594'
 repo_language: en
 subpackages:
   - name: node
