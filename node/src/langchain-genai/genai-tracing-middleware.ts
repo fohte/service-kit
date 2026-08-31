@@ -180,16 +180,24 @@ const messageToGenAiMessage = (message: BaseMessage): GenAiMessage => {
   }
 }
 
+const stringFieldOf = (value: unknown, key: string): string | undefined => {
+  if (!isRecord(value)) return undefined
+  const field = value[key]
+  return typeof field === 'string' && field.length > 0 ? field : undefined
+}
+
 // AIMessage#response_metadata is typed as Record<string, any>: chat model
 // integrations (e.g. @langchain/openai) merge their provider-specific
 // response fields (finish_reason, model_name, ...) into it uniformly,
 // whether the call streamed internally or not.
 const responseMetadataString = (
-  message: AIMessage,
+  message: unknown,
   key: string,
 ): string | undefined => {
-  const value: unknown = message.response_metadata[key]
-  return typeof value === 'string' && value.length > 0 ? value : undefined
+  // wrapModelCall's handler can resolve to a non-AIMessage wrapper for
+  // structured-output responses (see AgentNode#invokeModel in langchain).
+  if (!isRecord(message)) return undefined
+  return stringFieldOf(message['response_metadata'], key)
 }
 
 interface UsageTokens {
@@ -225,7 +233,12 @@ const reasoningPartsOf = (message: AIMessage): GenAiReasoningPart[] => {
     : []
 }
 
-const outputMessagesOf = (message: AIMessage): GenAiOutputMessage[] => {
+const outputMessagesOf = (
+  message: unknown,
+): GenAiOutputMessage[] | undefined => {
+  // wrapModelCall's handler can resolve to a non-AIMessage wrapper for
+  // structured-output responses (see responseMetadataString above).
+  if (!AIMessage.isInstance(message)) return undefined
   const base = messageToGenAiMessage(message)
   const withReasoning = {
     ...base,
@@ -237,12 +250,6 @@ const outputMessagesOf = (message: AIMessage): GenAiOutputMessage[] => {
       ? withReasoning
       : { ...withReasoning, finish_reason: finishReason },
   ]
-}
-
-const stringFieldOf = (value: unknown, key: string): string | undefined => {
-  if (!isRecord(value)) return undefined
-  const field = value[key]
-  return typeof field === 'string' && field.length > 0 ? field : undefined
 }
 
 // request.model is typed as the generic AgentLanguageModelLike (a bare
@@ -346,20 +353,21 @@ export const createGenAiTracingMiddleware = (
           span.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [finishReason])
         }
         if (captureMessageContent) {
-          // Result.fromThrowable, not try/catch: a serialization error here
-          // must not fail the model call itself, only be recorded on the span.
-          const buildOutputMessagesJson = Result.fromThrowable(
-            (): string => JSON.stringify(outputMessagesOf(response)),
-            (error) => error,
-          )
-          buildOutputMessagesJson().match(
-            (json) => {
-              span.setAttribute(ATTR_GEN_AI_OUTPUT_MESSAGES, json)
-            },
-            (error) => {
-              recordSpanException(span, error)
-            },
-          )
+          const outputMessages = outputMessagesOf(response)
+          if (outputMessages !== undefined) {
+            const buildOutputMessagesJson = Result.fromThrowable(
+              (): string => JSON.stringify(outputMessages),
+              (error) => error,
+            )
+            buildOutputMessagesJson().match(
+              (json) => {
+                span.setAttribute(ATTR_GEN_AI_OUTPUT_MESSAGES, json)
+              },
+              (error) => {
+                recordSpanException(span, error)
+              },
+            )
+          }
         }
         return response
       } catch (error) {

@@ -219,6 +219,69 @@ describe('createGenAiTracingMiddleware', () => {
     )
   })
 
+  // langchain's AgentNode resolves handler() to a { structuredResponse,
+  // messages } object instead of an AIMessage when the agent uses a native
+  // structured-output response format (see AgentNode#invokeModel's
+  // baseHandler in langchain@1.5.3's dist/agents/nodes/AgentNode.js), even
+  // though WrapModelCallHandler's static type promises an AIMessage.
+  it('does not throw when the handler resolves to a response with no response_metadata', async () => {
+    const wrapModelCall = defaultMiddleware()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately a non-AIMessage stand-in (see comment above)
+    const structuredResponse = {
+      structuredResponse: { city: 'Tokyo' },
+      messages: [new AIMessage('final')],
+    } as unknown as AIMessage
+
+    const response = await wrapModelCall(
+      fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
+      () => Promise.resolve(structuredResponse),
+    )
+
+    expect(response).toBe(structuredResponse)
+    expect(await collectSpans()).toEqual([
+      {
+        name: 'chat opencode-go/gpt-5',
+        kind: SpanKind.CLIENT,
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'opencode',
+          'gen_ai.request.model': 'opencode-go/gpt-5',
+        },
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ])
+  })
+
+  it('omits gen_ai.output.messages when capturing is enabled and the handler resolves to a non-AIMessage response', async () => {
+    const wrapModelCall = capturingMiddleware()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately a non-AIMessage stand-in (see comment above the previous test)
+    const structuredResponse = {
+      structuredResponse: { city: 'Tokyo' },
+      messages: [new AIMessage('final')],
+    } as unknown as AIMessage
+
+    await wrapModelCall(
+      fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
+      () => Promise.resolve(structuredResponse),
+    )
+
+    expect(await collectSpans()).toEqual([
+      {
+        name: 'chat opencode-go/gpt-5',
+        kind: SpanKind.CLIENT,
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'opencode',
+          'gen_ai.request.model': 'opencode-go/gpt-5',
+          'gen_ai.input.messages': JSON.stringify([
+            { role: 'user', parts: [{ type: 'text', content: 'hi' }] },
+          ]),
+        },
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ])
+  })
+
   it('rethrows the error the handler throws', async () => {
     const wrapModelCall = defaultMiddleware()
     const error = new Error('go usage limit')
