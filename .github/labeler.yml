@@ -1,0 +1,6 @@
+scope/node:
+  - changed-files:
+      - any-glob-to-any-file: node/**
+scope/rust:
+  - changed-files:
+      - any-glob-to-any-file: rust/**
