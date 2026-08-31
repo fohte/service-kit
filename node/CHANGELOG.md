@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/fohte/service-kit/compare/node-v0.1.12...node-v0.1.13) (2026-08-31)
+
+
+### Bug Fixes
+
+* **node/langchain-genai:** prevent TypeError on structured output responses ([#94](https://github.com/fohte/service-kit/issues/94)) ([eb314b4](https://github.com/fohte/service-kit/commit/eb314b4176ff8d1a84ed400d6160ba5da9e978d8))
+
 ## [0.1.12](https://github.com/fohte/service-kit/compare/node-v0.1.11...node-v0.1.12) (2026-08-22)
 
 
