@@ -183,12 +183,21 @@ const messageToGenAiMessage = (message: BaseMessage): GenAiMessage => {
 // AIMessage#response_metadata is typed as Record<string, any>: chat model
 // integrations (e.g. @langchain/openai) merge their provider-specific
 // response fields (finish_reason, model_name, ...) into it uniformly,
-// whether the call streamed internally or not.
+// whether the call streamed internally or not. wrapModelCall's handler is
+// typed to resolve to an AIMessage, but for a native structured-output
+// response format, langchain's AgentNode resolves it to a plain
+// { structuredResponse, messages } object instead (no response_metadata at
+// all) — see AgentNode#invokeModel's baseHandler in langchain's
+// dist/agents/nodes/AgentNode.js — so this reads through isRecord rather
+// than trusting that static type.
 const responseMetadataString = (
-  message: AIMessage,
+  message: unknown,
   key: string,
 ): string | undefined => {
-  const value: unknown = message.response_metadata[key]
+  if (!isRecord(message)) return undefined
+  const responseMetadata = message['response_metadata']
+  if (!isRecord(responseMetadata)) return undefined
+  const value = responseMetadata[key]
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
