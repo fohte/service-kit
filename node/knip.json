@@ -1,5 +1,16 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "treatConfigHintsAsErrors": true,
-  "ignoreDependencies": ["@commitlint/cli"]
+  "entry": [
+    "src/env/index.ts",
+    "src/langchain-genai/index.ts",
+    "src/logger/index.ts",
+    "src/observability/index.ts",
+    "src/octo-sts/index.ts",
+    "src/otel-register.ts",
+    "src/retry/index.ts",
+    "src/shutdown/index.ts"
+  ],
+  "ignore": ["src/octo-sts/gen/**"],
+  "ignoreDependencies": ["@commitlint/cli", "@bufbuild/protoc-gen-es"]
 }
