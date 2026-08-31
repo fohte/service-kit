@@ -252,6 +252,36 @@ describe('createGenAiTracingMiddleware', () => {
     ])
   })
 
+  it('omits gen_ai.output.messages when capturing is enabled and the handler resolves to a non-AIMessage response', async () => {
+    const wrapModelCall = capturingMiddleware()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately a non-AIMessage stand-in (see comment above the previous test)
+    const structuredResponse = {
+      structuredResponse: { city: 'Tokyo' },
+      messages: [new AIMessage('final')],
+    } as unknown as AIMessage
+
+    await wrapModelCall(
+      fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
+      () => Promise.resolve(structuredResponse),
+    )
+
+    expect(await collectSpans()).toEqual([
+      {
+        name: 'chat opencode-go/gpt-5',
+        kind: SpanKind.CLIENT,
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'opencode',
+          'gen_ai.request.model': 'opencode-go/gpt-5',
+          'gen_ai.input.messages': JSON.stringify([
+            { role: 'user', parts: [{ type: 'text', content: 'hi' }] },
+          ]),
+        },
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ])
+  })
+
   it('rethrows the error the handler throws', async () => {
     const wrapModelCall = defaultMiddleware()
     const error = new Error('go usage limit')

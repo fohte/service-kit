@@ -180,6 +180,12 @@ const messageToGenAiMessage = (message: BaseMessage): GenAiMessage => {
   }
 }
 
+const stringFieldOf = (value: unknown, key: string): string | undefined => {
+  if (!isRecord(value)) return undefined
+  const field = value[key]
+  return typeof field === 'string' && field.length > 0 ? field : undefined
+}
+
 // AIMessage#response_metadata is typed as Record<string, any>: chat model
 // integrations (e.g. @langchain/openai) merge their provider-specific
 // response fields (finish_reason, model_name, ...) into it uniformly,
@@ -195,10 +201,7 @@ const responseMetadataString = (
   key: string,
 ): string | undefined => {
   if (!isRecord(message)) return undefined
-  const responseMetadata = message['response_metadata']
-  if (!isRecord(responseMetadata)) return undefined
-  const value = responseMetadata[key]
-  return typeof value === 'string' && value.length > 0 ? value : undefined
+  return stringFieldOf(message['response_metadata'], key)
 }
 
 interface UsageTokens {
@@ -234,7 +237,13 @@ const reasoningPartsOf = (message: AIMessage): GenAiReasoningPart[] => {
     : []
 }
 
-const outputMessagesOf = (message: AIMessage): GenAiOutputMessage[] => {
+// Takes `unknown`, not AIMessage, for the same reason responseMetadataString
+// does: wrapModelCall's handler can resolve to langchain's structured-output
+// wrapper object instead of an AIMessage.
+const outputMessagesOf = (
+  message: unknown,
+): GenAiOutputMessage[] | undefined => {
+  if (!AIMessage.isInstance(message)) return undefined
   const base = messageToGenAiMessage(message)
   const withReasoning = {
     ...base,
@@ -246,12 +255,6 @@ const outputMessagesOf = (message: AIMessage): GenAiOutputMessage[] => {
       ? withReasoning
       : { ...withReasoning, finish_reason: finishReason },
   ]
-}
-
-const stringFieldOf = (value: unknown, key: string): string | undefined => {
-  if (!isRecord(value)) return undefined
-  const field = value[key]
-  return typeof field === 'string' && field.length > 0 ? field : undefined
 }
 
 // request.model is typed as the generic AgentLanguageModelLike (a bare
@@ -355,20 +358,24 @@ export const createGenAiTracingMiddleware = (
           span.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [finishReason])
         }
         if (captureMessageContent) {
-          // Result.fromThrowable, not try/catch: a serialization error here
-          // must not fail the model call itself, only be recorded on the span.
-          const buildOutputMessagesJson = Result.fromThrowable(
-            (): string => JSON.stringify(outputMessagesOf(response)),
-            (error) => error,
-          )
-          buildOutputMessagesJson().match(
-            (json) => {
-              span.setAttribute(ATTR_GEN_AI_OUTPUT_MESSAGES, json)
-            },
-            (error) => {
-              recordSpanException(span, error)
-            },
-          )
+          const outputMessages = outputMessagesOf(response)
+          if (outputMessages !== undefined) {
+            // Result.fromThrowable, not try/catch: a serialization error
+            // here must not fail the model call itself, only be recorded on
+            // the span.
+            const buildOutputMessagesJson = Result.fromThrowable(
+              (): string => JSON.stringify(outputMessages),
+              (error) => error,
+            )
+            buildOutputMessagesJson().match(
+              (json) => {
+                span.setAttribute(ATTR_GEN_AI_OUTPUT_MESSAGES, json)
+              },
+              (error) => {
+                recordSpanException(span, error)
+              },
+            )
+          }
         }
         return response
       } catch (error) {
