@@ -1,4 +1,4 @@
-export const REDACTED = '[REDACTED]'
+const REDACTED = '[REDACTED]'
 
 // Each pattern anchors on `(?:^|_)` so a bare key (`token`, `dsn`, `api_key`)
 // matches as well as suffixed keys (`SLACK_BOT_TOKEN`, `database_dsn`).
@@ -47,7 +47,7 @@ export const redactContainer = (
   return next
 }
 
-export const redactArray = (
+const redactArray = (
   key: string,
   array: readonly unknown[],
   secretPatterns: ReadonlyArray<RegExp>,
@@ -66,7 +66,7 @@ export const redactArray = (
   return next
 }
 
-export const redactValue = (
+const redactValue = (
   key: string,
   value: unknown,
   secretPatterns: ReadonlyArray<RegExp>,
