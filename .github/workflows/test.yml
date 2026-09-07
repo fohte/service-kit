@@ -227,17 +227,16 @@ jobs:
         working-directory: rust
         run: cargo test
 
-  # Aggregation gate for the per-package unit-test jobs. The dynamic per-package
-  # job names cannot be pinned as required status checks, so this single
-  # fixed-name job is the branch protection gate instead. It fails only when a
-  # needed job failed; when every leg succeeds (or is skipped because nothing
-  # changed) it is skipped, and a skipped required check counts as success.
+  # Fixed name for branch protection: per-package job names are dynamic, and
+  # knip (when generated) has no `needs`, so this gate (skip == success)
+  # stands in for both.
   unit-test:
     runs-on: ubuntu-slim
     needs:
       - detect-changes
       - unit-test-node
       - unit-test-rust
+      - knip
     if: failure()
     steps:
       - run: exit 1
