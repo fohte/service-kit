@@ -158,9 +158,6 @@ export const createOctoStsTokenCache = (
       })
 
   return {
-    // ponytail: no in-flight dedup -- a duplicate exchange on a concurrent
-    // cache miss is cheap at the call volumes this cache is built for. Add
-    // dedup if octo-sts load ever becomes a problem.
     getToken: () => {
       if (
         cached !== null &&
