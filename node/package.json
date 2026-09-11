@@ -127,6 +127,6 @@
     "prettier": "3.9.6",
     "tsc-alias": "1.8.17",
     "typescript": "6.0.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
