@@ -117,24 +117,41 @@ const capturingMiddleware = (): WrapModelCall =>
     }),
   )
 
+// AIMessage's usage_metadata is only typed through a generic structure
+// parameter that a plain `new AIMessage({...})` call can't infer;
+// Object.assign sidesteps that generic without weakening the field's
+// runtime shape (verified by genai-tracing-middleware.ts's own read path).
+const withUsageMetadata = (
+  message: AIMessage,
+  usage: {
+    readonly inputTokens: number
+    readonly outputTokens: number
+    readonly totalTokens: number
+  },
+): AIMessage => {
+  Object.assign(message, {
+    usage_metadata: {
+      input_tokens: usage.inputTokens,
+      output_tokens: usage.outputTokens,
+      total_tokens: usage.totalTokens,
+    },
+  })
+  return message
+}
+
 describe('createGenAiTracingMiddleware', () => {
   it('records a CLIENT span with GenAI attributes on success', async () => {
     const wrapModelCall = defaultMiddleware()
-    const aiMessage = new AIMessage({
-      content: 'hello there',
-      response_metadata: {
-        model_name: 'opencode-go/gpt-5-2025',
-        finish_reason: 'stop',
-      },
-    })
-    // AIMessage's usage_metadata is only typed through a generic structure
-    // parameter that a plain `new AIMessage({...})` call can't infer;
-    // Object.assign sidesteps that generic without weakening the field's
-    // runtime shape (verified by genai-tracing-middleware.ts's own read
-    // path).
-    Object.assign(aiMessage, {
-      usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
-    })
+    const aiMessage = withUsageMetadata(
+      new AIMessage({
+        content: 'hello there',
+        response_metadata: {
+          model_name: 'opencode-go/gpt-5-2025',
+          finish_reason: 'stop',
+        },
+      }),
+      { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+    )
 
     await wrapModelCall(
       fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
@@ -257,17 +274,19 @@ describe('createGenAiTracingMiddleware', () => {
 
   it('reads gen_ai.response.model, usage tokens, and finish reason from the wrapped raw AIMessage when the handler resolves to a structured-output response', async () => {
     const wrapModelCall = defaultMiddleware()
-    const rawAiMessage = new AIMessage({
-      content: '',
-      tool_calls: [{ id: 'call_1', name: 'extract', args: { city: 'Tokyo' } }],
-      response_metadata: {
-        model_name: 'opencode-go/gpt-5-2025',
-        finish_reason: 'tool_calls',
-      },
-    })
-    Object.assign(rawAiMessage, {
-      usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
-    })
+    const rawAiMessage = withUsageMetadata(
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          { id: 'call_1', name: 'extract', args: { city: 'Tokyo' } },
+        ],
+        response_metadata: {
+          model_name: 'opencode-go/gpt-5-2025',
+          finish_reason: 'tool_calls',
+        },
+      }),
+      { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+    )
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately a non-AIMessage stand-in (see comment above the previous test)
     const structuredResponse = {
       structuredResponse: { city: 'Tokyo' },
