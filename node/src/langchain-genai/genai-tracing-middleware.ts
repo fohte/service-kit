@@ -30,11 +30,11 @@ import {
   responseMetadataString,
   toolDescriptionOf,
   usageTokensOf,
-} from '#langchain-genai/genai-tracing-middleware/attributes'
+} from './genai-tracing-middleware/attributes'
 import {
   messageToGenAiMessage,
   outputMessagesOf,
-} from '#langchain-genai/genai-tracing-middleware/messages'
+} from './genai-tracing-middleware/messages'
 
 // The semconv package exports GEN_AI_OPERATION_NAME_VALUE_CHAT but has no
 // equivalent constant for gen_ai.tool.type's "function" value.

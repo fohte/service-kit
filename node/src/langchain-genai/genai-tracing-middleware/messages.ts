@@ -4,10 +4,7 @@ import {
   ToolMessage,
 } from '@langchain/core/messages'
 
-import {
-  isRecord,
-  responseMetadataString,
-} from '#langchain-genai/genai-tracing-middleware/attributes'
+import { isRecord, responseMetadataString } from './attributes'
 
 // Shapes below follow the GenAI semantic conventions' message format
 // (gen_ai.input.messages / gen_ai.output.messages):
