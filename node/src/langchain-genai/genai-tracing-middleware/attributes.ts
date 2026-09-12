@@ -4,10 +4,7 @@ import { type Span } from '@opentelemetry/api'
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-export const stringFieldOf = (
-  value: unknown,
-  key: string,
-): string | undefined => {
+const stringFieldOf = (value: unknown, key: string): string | undefined => {
   if (!isRecord(value)) return undefined
   const field = value[key]
   return typeof field === 'string' && field.length > 0 ? field : undefined
