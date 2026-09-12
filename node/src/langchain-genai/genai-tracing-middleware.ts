@@ -1,20 +1,6 @@
-import {
-  AIMessage,
-  type BaseMessage,
-  ToolMessage,
-} from '@langchain/core/messages'
-import {
-  type ClientTool,
-  isLangChainTool,
-  type ServerTool,
-} from '@langchain/core/tools'
-import {
-  context,
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  trace,
-} from '@opentelemetry/api'
+import { ToolMessage } from '@langchain/core/messages'
+import { isLangChainTool } from '@langchain/core/tools'
+import { context, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api'
 import {
   ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
@@ -37,6 +23,19 @@ import {
 import { createMiddleware } from 'langchain'
 import { Result } from 'neverthrow'
 
+import {
+  rawResponseMessageOf,
+  recordSpanException,
+  requestModelOf,
+  responseMetadataString,
+  toolDescriptionOf,
+  usageTokensOf,
+} from '#langchain-genai/genai-tracing-middleware/attributes'
+import {
+  messageToGenAiMessage,
+  outputMessagesOf,
+} from '#langchain-genai/genai-tracing-middleware/messages'
+
 // The semconv package exports GEN_AI_OPERATION_NAME_VALUE_CHAT but has no
 // equivalent constant for gen_ai.tool.type's "function" value.
 const GEN_AI_TOOL_TYPE_VALUE_FUNCTION = 'function'
@@ -55,235 +54,6 @@ export interface GenAiTracingMiddlewareOptions {
   readonly captureMessageContent?: boolean | undefined
   readonly env?: Readonly<Record<string, string | undefined>> | undefined
 }
-
-// Shapes below follow the GenAI semantic conventions' message format
-// (gen_ai.input.messages / gen_ai.output.messages):
-// https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-spans.md
-
-interface GenAiTextPart {
-  readonly type: 'text'
-  readonly content: string
-}
-
-interface GenAiToolCallPart {
-  readonly type: 'tool_call'
-  readonly id: string
-  readonly name: string
-  readonly arguments: unknown
-}
-
-interface GenAiToolCallResponsePart {
-  readonly type: 'tool_call_response'
-  readonly id: string
-  readonly response: string
-}
-
-interface GenAiReasoningPart {
-  readonly type: 'reasoning'
-  readonly content: string
-}
-
-type GenAiMessagePart =
-  | GenAiTextPart
-  | GenAiToolCallPart
-  | GenAiToolCallResponsePart
-  | GenAiReasoningPart
-
-interface GenAiMessage {
-  readonly role: string
-  readonly parts: readonly GenAiMessagePart[]
-}
-
-interface GenAiOutputMessage extends GenAiMessage {
-  readonly finish_reason?: string
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const roleForMessage = (message: BaseMessage): string => {
-  if (message.type === 'human') return 'user'
-  if (message.type === 'ai') return 'assistant'
-  return message.type
-}
-
-// Raw image bytes are redacted: they bloat span payloads and, unlike text,
-// carry no debugging value once reduced to an opaque data URL.
-const contentToGenAiParts = (
-  content: BaseMessage['content'],
-): GenAiMessagePart[] => {
-  if (typeof content === 'string') {
-    return content === '' ? [] : [{ type: 'text', content }]
-  }
-  return content.map((block): GenAiMessagePart => {
-    if (typeof block === 'string') {
-      return { type: 'text', content: block }
-    }
-    if (isRecord(block) && block['type'] === 'text' && 'text' in block) {
-      const text = block['text']
-      return { type: 'text', content: typeof text === 'string' ? text : '' }
-    }
-    // @langchain/core's standard content block union includes a `reasoning`
-    // block (distinct from the `additional_kwargs.reasoning_content` field
-    // some provider integrations use instead — see reasoningPartsOf below).
-    if (
-      isRecord(block) &&
-      block['type'] === 'reasoning' &&
-      'reasoning' in block
-    ) {
-      const text = block['reasoning']
-      return {
-        type: 'reasoning',
-        content: typeof text === 'string' ? text : '',
-      }
-    }
-    const blockType =
-      isRecord(block) && typeof block['type'] === 'string'
-        ? block['type']
-        : 'unknown'
-    return { type: 'text', content: `[${blockType} omitted]` }
-  })
-}
-
-const toolCallsToGenAiParts = (message: BaseMessage): GenAiToolCallPart[] => {
-  if (!AIMessage.isInstance(message)) return []
-  const toolCalls = message.tool_calls ?? []
-  return toolCalls.map((call) => ({
-    type: 'tool_call',
-    id: call.id ?? '',
-    name: call.name,
-    arguments: call.args,
-  }))
-}
-
-const messageToGenAiMessage = (message: BaseMessage): GenAiMessage => {
-  if (ToolMessage.isInstance(message)) {
-    const content = message.content
-    return {
-      role: 'tool',
-      parts: [
-        {
-          type: 'tool_call_response',
-          id: message.tool_call_id,
-          response:
-            typeof content === 'string' ? content : JSON.stringify(content),
-        },
-      ],
-    }
-  }
-  return {
-    role: roleForMessage(message),
-    parts: [
-      ...contentToGenAiParts(message.content),
-      ...toolCallsToGenAiParts(message),
-    ],
-  }
-}
-
-const stringFieldOf = (value: unknown, key: string): string | undefined => {
-  if (!isRecord(value)) return undefined
-  const field = value[key]
-  return typeof field === 'string' && field.length > 0 ? field : undefined
-}
-
-// AgentNode replaces the raw model response with a
-// `{ structuredResponse, messages }` wrapper when it resolves a
-// structured-output tool call or native-schema completion (see
-// AgentNode#invokeModel / #handleSingleStructuredOutput in langchain's
-// dist/agents/nodes/AgentNode.js). The raw AIMessage — the one carrying
-// usage_metadata/response_metadata — ends up at messages[0] instead of
-// being the response itself.
-const rawResponseMessageOf = (response: unknown): unknown => {
-  if (
-    !isRecord(response) ||
-    !('structuredResponse' in response) ||
-    !Array.isArray(response['messages'])
-  ) {
-    return response
-  }
-  return response['messages'][0]
-}
-
-// AIMessage#response_metadata is typed as Record<string, any>: chat model
-// integrations (e.g. @langchain/openai) merge their provider-specific
-// response fields (finish_reason, model_name, ...) into it uniformly,
-// whether the call streamed internally or not.
-const responseMetadataString = (
-  message: unknown,
-  key: string,
-): string | undefined => {
-  if (!isRecord(message)) return undefined
-  return stringFieldOf(message['response_metadata'], key)
-}
-
-interface UsageTokens {
-  readonly inputTokens: number
-  readonly outputTokens: number
-}
-
-// AIMessage#usage_metadata is typed through a generic MessageStructure that
-// resolves to `undefined` unless the message was constructed with an
-// explicit structure parameter, which a handler-returned AIMessage never
-// carries — so this reads the field at runtime instead of through the
-// (uninformative) static type.
-const usageTokensOf = (message: unknown): UsageTokens | undefined => {
-  if (!isRecord(message)) return undefined
-  const usageMetadata = message['usage_metadata']
-  if (!isRecord(usageMetadata)) return undefined
-  const inputTokens = usageMetadata['input_tokens']
-  const outputTokens = usageMetadata['output_tokens']
-  if (typeof inputTokens !== 'number' || typeof outputTokens !== 'number') {
-    return undefined
-  }
-  return { inputTokens, outputTokens }
-}
-
-// @langchain/openai reads the upstream provider's `reasoning_content`
-// response field (set when the model call requests
-// `modelKwargs: { reasoning_split: true }`) into this field rather than
-// `message.content`, so contentToGenAiParts alone never sees it.
-const reasoningPartsOf = (message: AIMessage): GenAiReasoningPart[] => {
-  const reasoningContent = message.additional_kwargs['reasoning_content']
-  return typeof reasoningContent === 'string' && reasoningContent.length > 0
-    ? [{ type: 'reasoning', content: reasoningContent }]
-    : []
-}
-
-const outputMessagesOf = (
-  message: unknown,
-): GenAiOutputMessage[] | undefined => {
-  if (!AIMessage.isInstance(message)) return undefined
-  const base = messageToGenAiMessage(message)
-  const withReasoning = {
-    ...base,
-    parts: [...reasoningPartsOf(message), ...base.parts],
-  }
-  const finishReason = responseMetadataString(message, 'finish_reason')
-  return [
-    finishReason === undefined
-      ? withReasoning
-      : { ...withReasoning, finish_reason: finishReason },
-  ]
-}
-
-// request.model is typed as the generic AgentLanguageModelLike (a bare
-// Runnable), but chat model integrations (e.g. ChatOpenAI) expose the
-// requested model id as a public `model` field, so this reads it at runtime
-// instead of through that uninformative static type.
-const requestModelOf = (model: unknown): string | undefined =>
-  stringFieldOf(model, 'model')
-
-const recordSpanException = (span: Span, error: unknown): void => {
-  span.recordException(error instanceof Error ? error : String(error))
-}
-
-// request.tool is typed as ClientTool | ServerTool | undefined, where
-// ServerTool is a bare Record<string, unknown> and dynamically registered
-// tools have no request.tool at all, so this reads the field at runtime
-// instead of through that uninformative static type.
-const toolDescriptionOf = (
-  tool: ClientTool | ServerTool | undefined,
-): string | undefined => stringFieldOf(tool, 'description')
 
 // One CLIENT span per model inference call, matching the GenAI semantic
 // conventions' `{gen_ai.operation.name} {gen_ai.request.model}` span. Wraps
