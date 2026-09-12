@@ -186,6 +186,24 @@ const stringFieldOf = (value: unknown, key: string): string | undefined => {
   return typeof field === 'string' && field.length > 0 ? field : undefined
 }
 
+// AgentNode replaces the raw model response with a
+// `{ structuredResponse, messages }` wrapper when it resolves a
+// structured-output tool call or native-schema completion (see
+// AgentNode#invokeModel / #handleSingleStructuredOutput in langchain's
+// dist/agents/nodes/AgentNode.js). The raw AIMessage — the one carrying
+// usage_metadata/response_metadata — ends up at messages[0] instead of
+// being the response itself.
+const rawResponseMessageOf = (response: unknown): unknown => {
+  if (
+    !isRecord(response) ||
+    !('structuredResponse' in response) ||
+    !Array.isArray(response['messages'])
+  ) {
+    return response
+  }
+  return response['messages'][0]
+}
+
 // AIMessage#response_metadata is typed as Record<string, any>: chat model
 // integrations (e.g. @langchain/openai) merge their provider-specific
 // response fields (finish_reason, model_name, ...) into it uniformly,
@@ -194,8 +212,6 @@ const responseMetadataString = (
   message: unknown,
   key: string,
 ): string | undefined => {
-  // wrapModelCall's handler can resolve to a non-AIMessage wrapper for
-  // structured-output responses (see AgentNode#invokeModel in langchain).
   if (!isRecord(message)) return undefined
   return stringFieldOf(message['response_metadata'], key)
 }
@@ -210,7 +226,7 @@ interface UsageTokens {
 // explicit structure parameter, which a handler-returned AIMessage never
 // carries — so this reads the field at runtime instead of through the
 // (uninformative) static type.
-const usageTokensOf = (message: BaseMessage): UsageTokens | undefined => {
+const usageTokensOf = (message: unknown): UsageTokens | undefined => {
   if (!isRecord(message)) return undefined
   const usageMetadata = message['usage_metadata']
   if (!isRecord(usageMetadata)) return undefined
@@ -236,8 +252,6 @@ const reasoningPartsOf = (message: AIMessage): GenAiReasoningPart[] => {
 const outputMessagesOf = (
   message: unknown,
 ): GenAiOutputMessage[] | undefined => {
-  // wrapModelCall's handler can resolve to a non-AIMessage wrapper for
-  // structured-output responses (see responseMetadataString above).
   if (!AIMessage.isInstance(message)) return undefined
   const base = messageToGenAiMessage(message)
   const withReasoning = {
@@ -339,21 +353,25 @@ export const createGenAiTracingMiddleware = (
       // eslint-disable-next-line no-restricted-syntax -- boundary: wraps LangChain's throw-based wrapModelCall handler contract; finally guarantees span.end() runs even when the model call throws
       try {
         const response = await context.with(spanContext, () => handler(request))
-        const responseModel = responseMetadataString(response, 'model_name')
+        const rawResponse = rawResponseMessageOf(response)
+        const responseModel = responseMetadataString(rawResponse, 'model_name')
         if (responseModel !== undefined) {
           span.setAttribute(ATTR_GEN_AI_RESPONSE_MODEL, responseModel)
         }
-        const usage = usageTokensOf(response)
+        const usage = usageTokensOf(rawResponse)
         if (usage !== undefined) {
           span.setAttribute(ATTR_GEN_AI_USAGE_INPUT_TOKENS, usage.inputTokens)
           span.setAttribute(ATTR_GEN_AI_USAGE_OUTPUT_TOKENS, usage.outputTokens)
         }
-        const finishReason = responseMetadataString(response, 'finish_reason')
+        const finishReason = responseMetadataString(
+          rawResponse,
+          'finish_reason',
+        )
         if (finishReason !== undefined) {
           span.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [finishReason])
         }
         if (captureMessageContent) {
-          const outputMessages = outputMessagesOf(response)
+          const outputMessages = outputMessagesOf(rawResponse)
           if (outputMessages !== undefined) {
             const buildOutputMessagesJson = Result.fromThrowable(
               (): string => JSON.stringify(outputMessages),
