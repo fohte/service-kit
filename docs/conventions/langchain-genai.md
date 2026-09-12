@@ -22,6 +22,10 @@ Conventions for the LangChain agent tracing layer of `@fohte/service-kit` (Node)
 
 LangChain's agent runtime carries the system prompt on a separate `request.systemMessage` field, and some providers return reasoning content on `additional_kwargs.reasoning_content` rather than `message.content`. Both are still part of what the model actually saw or produced, so they're folded into `gen_ai.input.messages` / `gen_ai.output.messages` (system prompt as the first input message, reasoning as the first part of the output message) instead of being silently dropped.
 
+### Structured-output turns wrap the raw model response
+
+When `createAgent`'s structured-output support resolves a response — either its native-schema strategy or its tool-call strategy — LangChain's `AgentNode` replaces the raw `AIMessage` with a `{ structuredResponse, messages }` object instead of returning it directly (see `AgentNode#invokeModel` / `#handleSingleStructuredOutput` in `langchain`'s `dist/agents/nodes/AgentNode.js`), even though `wrapModelCall`'s handler is statically typed to always resolve to an `AIMessage`. The raw `AIMessage` — the one carrying `response_metadata` and `usage_metadata` — ends up at `messages[0]` of that wrapper rather than being the response itself, so this middleware unwraps it before reading `gen_ai.response.model`, usage tokens, finish reason, or `gen_ai.output.messages`. The handler's own return value is passed through to the caller unchanged.
+
 ## Node
 
 ### API

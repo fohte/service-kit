@@ -21,6 +21,8 @@ export default config(
       'src/observability/sentry.ts',
       'src/env/index.ts',
       'src/langchain-genai/index.ts',
+      'src/langchain-genai/genai-tracing-middleware.ts',
+      'src/langchain-genai/genai-tracing-middleware/messages.ts',
       'src/octo-sts/index.ts',
       'src/octo-sts/octo-sts.ts',
       'src/retry/index.ts',

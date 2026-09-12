@@ -117,24 +117,41 @@ const capturingMiddleware = (): WrapModelCall =>
     }),
   )
 
+// AIMessage's usage_metadata is only typed through a generic structure
+// parameter that a plain `new AIMessage({...})` call can't infer;
+// Object.assign sidesteps that generic without weakening the field's
+// runtime shape (verified by genai-tracing-middleware.ts's own read path).
+const withUsageMetadata = (
+  message: AIMessage,
+  usage: {
+    readonly inputTokens: number
+    readonly outputTokens: number
+    readonly totalTokens: number
+  },
+): AIMessage => {
+  Object.assign(message, {
+    usage_metadata: {
+      input_tokens: usage.inputTokens,
+      output_tokens: usage.outputTokens,
+      total_tokens: usage.totalTokens,
+    },
+  })
+  return message
+}
+
 describe('createGenAiTracingMiddleware', () => {
   it('records a CLIENT span with GenAI attributes on success', async () => {
     const wrapModelCall = defaultMiddleware()
-    const aiMessage = new AIMessage({
-      content: 'hello there',
-      response_metadata: {
-        model_name: 'opencode-go/gpt-5-2025',
-        finish_reason: 'stop',
-      },
-    })
-    // AIMessage's usage_metadata is only typed through a generic structure
-    // parameter that a plain `new AIMessage({...})` call can't infer;
-    // Object.assign sidesteps that generic without weakening the field's
-    // runtime shape (verified by genai-tracing-middleware.ts's own read
-    // path).
-    Object.assign(aiMessage, {
-      usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
-    })
+    const aiMessage = withUsageMetadata(
+      new AIMessage({
+        content: 'hello there',
+        response_metadata: {
+          model_name: 'opencode-go/gpt-5-2025',
+          finish_reason: 'stop',
+        },
+      }),
+      { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+    )
 
     await wrapModelCall(
       fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
@@ -220,10 +237,13 @@ describe('createGenAiTracingMiddleware', () => {
   })
 
   // langchain's AgentNode resolves handler() to a { structuredResponse,
-  // messages } object instead of an AIMessage when the agent uses a native
-  // structured-output response format (see AgentNode#invokeModel's
-  // baseHandler in langchain@1.5.3's dist/agents/nodes/AgentNode.js), even
-  // though WrapModelCallHandler's static type promises an AIMessage.
+  // messages } object instead of an AIMessage when the agent resolves a
+  // structured-output tool call or native-schema completion (see
+  // AgentNode#invokeModel / #handleSingleStructuredOutput in langchain@1.5.3's
+  // dist/agents/nodes/AgentNode.js), even though WrapModelCallHandler's
+  // static type promises an AIMessage. The raw model response — the one
+  // carrying response_metadata/usage_metadata — is messages[0] of that
+  // wrapper.
   it('does not throw when the handler resolves to a response with no response_metadata', async () => {
     const wrapModelCall = defaultMiddleware()
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately a non-AIMessage stand-in (see comment above)
@@ -252,9 +272,61 @@ describe('createGenAiTracingMiddleware', () => {
     ])
   })
 
-  it('omits gen_ai.output.messages when capturing is enabled and the handler resolves to a non-AIMessage response', async () => {
-    const wrapModelCall = capturingMiddleware()
+  it('reads gen_ai.response.model, usage tokens, and finish reason from the wrapped raw AIMessage when the handler resolves to a structured-output response', async () => {
+    const wrapModelCall = defaultMiddleware()
+    const rawAiMessage = withUsageMetadata(
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          { id: 'call_1', name: 'extract', args: { city: 'Tokyo' } },
+        ],
+        response_metadata: {
+          model_name: 'opencode-go/gpt-5-2025',
+          finish_reason: 'tool_calls',
+        },
+      }),
+      { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+    )
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately a non-AIMessage stand-in (see comment above the previous test)
+    const structuredResponse = {
+      structuredResponse: { city: 'Tokyo' },
+      messages: [
+        rawAiMessage,
+        new ToolMessage({
+          content: '{"city":"Tokyo"}',
+          tool_call_id: 'call_1',
+        }),
+        new AIMessage('Returning structured response'),
+      ],
+    } as unknown as AIMessage
+
+    const response = await wrapModelCall(
+      fakeRequest({ model: 'opencode-go/gpt-5' }, [new HumanMessage('hi')]),
+      () => Promise.resolve(structuredResponse),
+    )
+
+    expect(response).toBe(structuredResponse)
+    expect(await collectSpans()).toEqual([
+      {
+        name: 'chat opencode-go/gpt-5',
+        kind: SpanKind.CLIENT,
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'opencode',
+          'gen_ai.request.model': 'opencode-go/gpt-5',
+          'gen_ai.response.model': 'opencode-go/gpt-5-2025',
+          'gen_ai.usage.input_tokens': 10,
+          'gen_ai.usage.output_tokens': 5,
+          'gen_ai.response.finish_reasons': ['tool_calls'],
+        },
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ])
+  })
+
+  it('captures gen_ai.output.messages from the wrapped raw AIMessage when capturing is enabled and the handler resolves to a structured-output response', async () => {
+    const wrapModelCall = capturingMiddleware()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately a non-AIMessage stand-in (see comment above the earlier structured-output test)
     const structuredResponse = {
       structuredResponse: { city: 'Tokyo' },
       messages: [new AIMessage('final')],
@@ -275,6 +347,9 @@ describe('createGenAiTracingMiddleware', () => {
           'gen_ai.request.model': 'opencode-go/gpt-5',
           'gen_ai.input.messages': JSON.stringify([
             { role: 'user', parts: [{ type: 'text', content: 'hi' }] },
+          ]),
+          'gen_ai.output.messages': JSON.stringify([
+            { role: 'assistant', parts: [{ type: 'text', content: 'final' }] },
           ]),
         },
         statusCode: SpanStatusCode.UNSET,
