@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.14](https://github.com/fohte/service-kit/compare/node-v0.1.13...node-v0.1.14) (2026-09-12)
+
+
+### Bug Fixes
+
+* **langchain-genai:** read token counts and metadata from the wrapper during structured output ([#104](https://github.com/fohte/service-kit/issues/104)) ([491622a](https://github.com/fohte/service-kit/commit/491622a1a7da73ce1d9bdb12c4266b3be1f3321c))
+
 ## [0.1.13](https://github.com/fohte/service-kit/compare/node-v0.1.12...node-v0.1.13) (2026-08-31)
 
 
