@@ -4,14 +4,20 @@
 // unless this loader hook is registered before the app itself loads — without
 // it, `http.Server` is never patched and no server-side spans are created.
 // https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/esm-support.md
-import { register } from 'node:module'
+import { register as registerAsync } from 'node:module'
 
-// `import.meta.url`, not a cwd-derived URL: `register()` resolves the bare
-// specifier against this parentURL synchronously and throws if it can't, so
-// the resolution must stay anchored to this file regardless of the process's
-// working directory at startup. Anchoring here — inside `@fohte/service-kit`
-// rather than the consumer's own code — means the specifier resolves against
-// this package's own dependency on `@opentelemetry/instrumentation`, so it
-// works under pnpm's strict node_modules without the consumer declaring that
-// dependency itself.
-register('@opentelemetry/instrumentation/hook.mjs', import.meta.url)
+import {
+  register as registerSync,
+  supportsSyncHooks,
+} from 'import-in-the-middle/register-hooks.mjs'
+
+if (supportsSyncHooks()) {
+  // ESM-only instrumentation for modules outside this list is not applied.
+  registerSync({
+    include: ['http', 'https', 'node:http', 'node:https'],
+  })
+} else {
+  // Anchor resolution to this file so pnpm's strict node_modules can resolve
+  // service-kit dependencies without requiring consumers to declare them.
+  registerAsync('@opentelemetry/instrumentation/hook.mjs', import.meta.url)
+}
