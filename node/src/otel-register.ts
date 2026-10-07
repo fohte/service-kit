@@ -4,20 +4,53 @@
 // unless this loader hook is registered before the app itself loads — without
 // it, `http.Server` is never patched and no server-side spans are created.
 // https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/esm-support.md
-import { register as registerAsync } from 'node:module'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
+
+import { Result, ResultAsync } from 'neverthrow'
 
 import {
-  register as registerSync,
-  supportsSyncHooks,
-} from 'import-in-the-middle/register-hooks.mjs'
+  registerOtelHooks,
+  type SyncHooksApi,
+} from './otel-register-registration.js'
 
-if (supportsSyncHooks()) {
-  // ESM-only instrumentation for modules outside this list is not applied.
-  registerSync({
-    include: ['http', 'https', 'node:http', 'node:https'],
-  })
-} else {
-  // Anchor resolution to this file so pnpm's strict node_modules can resolve
-  // service-kit dependencies without requiring consumers to declare them.
-  registerAsync('@opentelemetry/instrumentation/hook.mjs', import.meta.url)
+function isSyncHooksApi(value: unknown): value is SyncHooksApi {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  return (
+    'register' in value &&
+    typeof value.register === 'function' &&
+    'supportsSyncHooks' in value &&
+    typeof value.supportsSyncHooks === 'function'
+  )
 }
+
+const syncHooksEntryPath = Result.fromThrowable(
+  () => {
+    const instrumentationEntryPath = createRequire(import.meta.url).resolve(
+      '@opentelemetry/instrumentation',
+    )
+
+    // OTel Hook instances and the synchronous hook must share the same registry.
+    return createRequire(instrumentationEntryPath).resolve(
+      'import-in-the-middle/register-hooks.mjs',
+    )
+  },
+  () => undefined,
+)().unwrapOr(undefined)
+
+const syncHooksApi =
+  syncHooksEntryPath === undefined
+    ? undefined
+    : await ResultAsync.fromPromise(
+        import(pathToFileURL(syncHooksEntryPath).href),
+        () => undefined,
+      )
+        .map((module): SyncHooksApi | undefined =>
+          isSyncHooksApi(module) ? module : undefined,
+        )
+        .unwrapOr(undefined)
+
+registerOtelHooks(syncHooksApi, import.meta.url)

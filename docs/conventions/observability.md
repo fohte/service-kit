@@ -151,7 +151,9 @@ initObservability(process.env, {
 
 ### ESM loader hook
 
-`@fohte/service-kit/otel-register` registers the `@opentelemetry/instrumentation` ESM loader hook (`register('@opentelemetry/instrumentation/hook.mjs', import.meta.url)`) as a side effect on import. Node's ESM loader bypasses `require()`, so without this hook registered before the service loads, `@opentelemetry/auto-instrumentations-node` never patches built-in modules like `http`, and no server-side spans are created.
+`@fohte/service-kit/otel-register` registers an ESM hook as a side effect on import. Node's ESM loader bypasses `require()`, so without this hook registered before the service loads, `@opentelemetry/auto-instrumentations-node` never patches built-in modules like `http`, and no server-side spans are created.
+
+The preload loads the synchronous hook API from the same `import-in-the-middle` installation resolved by `@opentelemetry/instrumentation`. When `supportsSyncHooks()` returns `true`, it intercepts only `http` and `https` imports, including `node:` specifiers, without creating a loader worker. ESM-only instrumentation for other modules is not applied in this mode. If the synchronous API is unavailable or the Node.js runtime does not support it, the preload falls back to `@opentelemetry/instrumentation`'s asynchronous hook across all modules.
 
 Preload it via `node --import`, ahead of the service entry point:
 
@@ -159,7 +161,7 @@ Preload it via `node --import`, ahead of the service entry point:
 node --import @fohte/service-kit/otel-register dist/index.js
 ```
 
-Because the hook is registered from inside `@fohte/service-kit` rather than the consumer's own code, the bare specifier resolves against this package's own dependency on `@opentelemetry/instrumentation` — the consumer does not need to depend on it directly, even under pnpm's strict `node_modules`.
+Both hook implementations resolve from `@fohte/service-kit`'s dependency graph, so consumers do not need to install `@opentelemetry/instrumentation` or `import-in-the-middle` directly, even under pnpm's strict `node_modules`.
 
 The registration is unconditional: passing `--import` is itself the opt-in, so it runs regardless of whether OTel is configured at runtime, and it throws synchronously if `@opentelemetry/instrumentation` is not installed. Only wire `--import @fohte/service-kit/otel-register` into services that install it (directly, or transitively via `@opentelemetry/auto-instrumentations-node`).
 

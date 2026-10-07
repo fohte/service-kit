@@ -29,10 +29,8 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 | `retry`           | Sleep + exponential-backoff retry helper                                                   |
 | `shutdown`        | Ordered SIGTERM/SIGINT cleanup steps (drain, close server, ...) plus process exit          |
 
-On Node.js versions that support synchronous loader hooks, `otel-register` intercepts
-only `http` and `https` imports, including `node:` specifiers. ESM-only instrumentation
-for other modules is not applied in this mode. Older Node.js versions keep the existing
-asynchronous hook across all modules.
+See the [observability conventions](./docs/conventions/observability.md#esm-loader-hook)
+for `otel-register`'s runtime selection and ESM instrumentation coverage.
 
 #### Rust (`fohte-service-kit`)
 
