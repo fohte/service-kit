@@ -7,9 +7,6 @@ allowBuilds:
   protobufjs: true
   # required by @fohte/eslint-config -> eslint-plugin-import-x for module resolution
   unrs-resolver: true
-overrides:
-  # OpenTelemetry must share the synchronous hook's in-process registry.
-  import-in-the-middle: 3.3.3
 # Dodge short-lived supply-chain attacks (e.g. shai-hulud, tinycolor) by
 # holding off freshly published versions. Unit is minutes; 10080 = 7 days.
 minimumReleaseAge: 10080
