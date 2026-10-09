@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/fohte/service-kit/compare/node-v0.1.14...node-v0.1.15) (2026-10-09)
+
+
+### Features
+
+* **node:** restrict ESM hook targets to HTTP modules ([#111](https://github.com/fohte/service-kit/issues/111)) ([503e06d](https://github.com/fohte/service-kit/commit/503e06d8ac90579ceb9dbb902b35436c2a7e6976))
+
 ## [0.1.14](https://github.com/fohte/service-kit/compare/node-v0.1.13...node-v0.1.14) (2026-09-12)
 
 
