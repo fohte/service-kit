@@ -4,14 +4,53 @@
 // unless this loader hook is registered before the app itself loads — without
 // it, `http.Server` is never patched and no server-side spans are created.
 // https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/esm-support.md
-import { register } from 'node:module'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 
-// `import.meta.url`, not a cwd-derived URL: `register()` resolves the bare
-// specifier against this parentURL synchronously and throws if it can't, so
-// the resolution must stay anchored to this file regardless of the process's
-// working directory at startup. Anchoring here — inside `@fohte/service-kit`
-// rather than the consumer's own code — means the specifier resolves against
-// this package's own dependency on `@opentelemetry/instrumentation`, so it
-// works under pnpm's strict node_modules without the consumer declaring that
-// dependency itself.
-register('@opentelemetry/instrumentation/hook.mjs', import.meta.url)
+import { Result, ResultAsync } from 'neverthrow'
+
+import {
+  registerOtelHooks,
+  type SyncHooksApi,
+} from './otel-register-registration.js'
+
+function isSyncHooksApi(value: unknown): value is SyncHooksApi {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  return (
+    'register' in value &&
+    typeof value.register === 'function' &&
+    'supportsSyncHooks' in value &&
+    typeof value.supportsSyncHooks === 'function'
+  )
+}
+
+const syncHooksEntryPath = Result.fromThrowable(
+  () => {
+    const instrumentationEntryPath = createRequire(import.meta.url).resolve(
+      '@opentelemetry/instrumentation',
+    )
+
+    // OTel Hook instances and the synchronous hook must share the same registry.
+    return createRequire(instrumentationEntryPath).resolve(
+      'import-in-the-middle/register-hooks.mjs',
+    )
+  },
+  () => undefined,
+)().unwrapOr(undefined)
+
+const syncHooksApi =
+  syncHooksEntryPath === undefined
+    ? undefined
+    : await ResultAsync.fromPromise(
+        import(pathToFileURL(syncHooksEntryPath).href),
+        () => undefined,
+      )
+        .map((module): SyncHooksApi | undefined =>
+          isSyncHooksApi(module) ? module : undefined,
+        )
+        .unwrapOr(undefined)
+
+registerOtelHooks(syncHooksApi, import.meta.url)

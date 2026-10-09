@@ -29,6 +29,9 @@ Cross-language parity (implemented for the Node package and the Rust crate alike
 | `retry`           | Sleep + exponential-backoff retry helper                                                   |
 | `shutdown`        | Ordered SIGTERM/SIGINT cleanup steps (drain, close server, ...) plus process exit          |
 
+See the [observability conventions](./docs/conventions/observability.md#esm-loader-hook)
+for `otel-register`'s runtime selection and ESM instrumentation coverage.
+
 #### Rust (`fohte-service-kit`)
 
 | Module    | Provides                                      |
