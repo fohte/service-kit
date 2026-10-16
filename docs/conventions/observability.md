@@ -124,6 +124,8 @@ initObservabilityIfConfigured(process.env)
 
 `createNodeSdk` disables `@opentelemetry/instrumentation-openai` in the auto-instrumentation set unconditionally. It records request/response bodies only via OTel Logs, and since `initObservability` does not configure a logs exporter, every GENERATION it emits carries an empty body and shows up as a duplicate in Langfuse.
 
+Metric views drop every instrument from `@opentelemetry/instrumentation-http` and `@opentelemetry/instrumentation-undici`, plus `v8js.gc.duration`. Other runtime metrics and application-created metrics remain available through the configured metrics reader.
+
 ### Options
 
 | Option                   | Type                                            | Purpose                                                                                                                                                               |

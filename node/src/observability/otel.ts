@@ -8,6 +8,7 @@ import { resourceFromAttributes } from '@opentelemetry/resources'
 import {
   AggregationType,
   PeriodicExportingMetricReader,
+  type ViewOptions,
 } from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import type { Sampler, SpanProcessor } from '@opentelemetry/sdk-trace-base'
@@ -182,6 +183,21 @@ export const createInstrumentations = (): Instrumentation[] =>
     '@opentelemetry/instrumentation-openai': { enabled: false },
   })
 
+export const createMetricViews = (): ViewOptions[] => [
+  {
+    meterName: '@opentelemetry/instrumentation-http',
+    aggregation: { type: AggregationType.DROP },
+  },
+  {
+    meterName: '@opentelemetry/instrumentation-undici',
+    aggregation: { type: AggregationType.DROP },
+  },
+  {
+    instrumentName: 'v8js.gc.duration',
+    aggregation: { type: AggregationType.DROP },
+  },
+]
+
 export const createNodeSdk = (options: OtelOptions): NodeSDK => {
   const {
     env,
@@ -230,20 +246,7 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     ...(mergedSpanProcessors ? { spanProcessors: mergedSpanProcessors } : {}),
     ...(propagator ? { textMapPropagator: propagator } : {}),
     ...(contextManager ? { contextManager } : {}),
-    views: [
-      {
-        meterName: '@opentelemetry/instrumentation-http',
-        aggregation: { type: AggregationType.DROP },
-      },
-      {
-        meterName: '@opentelemetry/instrumentation-undici',
-        aggregation: { type: AggregationType.DROP },
-      },
-      {
-        instrumentName: 'v8js.gc.duration',
-        aggregation: { type: AggregationType.DROP },
-      },
-    ],
+    views: createMetricViews(),
     // Always pass `metricReaders` (even as `[]`) rather than the deprecated
     // singular `metricReader` option. Omitting both makes NodeSDK fall back
     // to its own env-based auto-config (`getMetricReadersFromEnv`), which
