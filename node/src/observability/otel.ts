@@ -5,7 +5,10 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Instrumentation } from '@opentelemetry/instrumentation'
 import type { Resource } from '@opentelemetry/resources'
 import { resourceFromAttributes } from '@opentelemetry/resources'
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
+import {
+  AggregationType,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import type { Sampler, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
@@ -227,6 +230,20 @@ export const createNodeSdk = (options: OtelOptions): NodeSDK => {
     ...(mergedSpanProcessors ? { spanProcessors: mergedSpanProcessors } : {}),
     ...(propagator ? { textMapPropagator: propagator } : {}),
     ...(contextManager ? { contextManager } : {}),
+    views: [
+      {
+        meterName: '@opentelemetry/instrumentation-http',
+        aggregation: { type: AggregationType.DROP },
+      },
+      {
+        meterName: '@opentelemetry/instrumentation-undici',
+        aggregation: { type: AggregationType.DROP },
+      },
+      {
+        instrumentName: 'v8js.gc.duration',
+        aggregation: { type: AggregationType.DROP },
+      },
+    ],
     // Always pass `metricReaders` (even as `[]`) rather than the deprecated
     // singular `metricReader` option. Omitting both makes NodeSDK fall back
     // to its own env-based auto-config (`getMetricReadersFromEnv`), which

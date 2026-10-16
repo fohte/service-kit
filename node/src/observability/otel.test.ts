@@ -1,5 +1,9 @@
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
-import { describe, expect, it } from 'vitest'
+import {
+  AggregationType,
+  PeriodicExportingMetricReader,
+  type ViewOptions,
+} from '@opentelemetry/sdk-metrics'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createInstrumentations,
@@ -9,6 +13,15 @@ import {
   resolveMetricsEndpoint,
   resolveTracesEndpoint,
 } from '#observability/otel'
+
+const { nodeSdkConstructorMock } = vi.hoisted(() => ({
+  nodeSdkConstructorMock:
+    vi.fn<(configuration: { views?: ViewOptions[] }) => void>(),
+}))
+
+vi.mock('@opentelemetry/sdk-node', () => ({
+  NodeSDK: nodeSdkConstructorMock,
+}))
 
 describe('isOtelConfigured', () => {
   it('returns true when the base endpoint is set', () => {
@@ -185,6 +198,10 @@ describe('createInstrumentations', () => {
 })
 
 describe('createNodeSdk', () => {
+  beforeEach(() => {
+    nodeSdkConstructorMock.mockClear()
+  })
+
   const MISSING_ENDPOINT_MESSAGE =
     'OTEL_EXPORTER_OTLP_ENDPOINT (or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT) is required to build the OpenTelemetry SDK. Provide a dummy endpoint in development if you do not have an OTLP collector configured.'
   const MISSING_SERVICE_NAME_MESSAGE =
@@ -208,5 +225,35 @@ describe('createNodeSdk', () => {
         env: { OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example/' },
       }),
     ).toThrow(new Error(MISSING_SERVICE_NAME_MESSAGE))
+  })
+
+  it('drops unused auto-instrumentation metrics', () => {
+    createNodeSdk({
+      env: {
+        OTEL_EXPORTER_OTLP_ENDPOINT: 'https://otlp.example/',
+        OTEL_SERVICE_NAME: 'test-service',
+      },
+    })
+
+    expect(
+      nodeSdkConstructorMock.mock.calls.map(
+        ([configuration]) => configuration.views,
+      ),
+    ).toEqual([
+      [
+        {
+          meterName: '@opentelemetry/instrumentation-http',
+          aggregation: { type: AggregationType.DROP },
+        },
+        {
+          meterName: '@opentelemetry/instrumentation-undici',
+          aggregation: { type: AggregationType.DROP },
+        },
+        {
+          instrumentName: 'v8js.gc.duration',
+          aggregation: { type: AggregationType.DROP },
+        },
+      ],
+    ])
   })
 })
