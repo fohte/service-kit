@@ -1,13 +1,9 @@
-import {
-  AggregationType,
-  PeriodicExportingMetricReader,
-} from '@opentelemetry/sdk-metrics'
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { describe, expect, it } from 'vitest'
 
 import {
   createInstrumentations,
   createMetricReader,
-  createMetricViews,
   createNodeSdk,
   isOtelConfigured,
   resolveMetricsEndpoint,
@@ -185,25 +181,6 @@ describe('createInstrumentations', () => {
   it('still includes other auto instrumentations', () => {
     const names = createInstrumentations().map((i) => i.instrumentationName)
     expect(names.includes('@opentelemetry/instrumentation-http')).toBe(true)
-  })
-})
-
-describe('createMetricViews', () => {
-  it('drops unused auto-instrumentation metrics', () => {
-    expect(createMetricViews()).toEqual([
-      {
-        meterName: '@opentelemetry/instrumentation-http',
-        aggregation: { type: AggregationType.DROP },
-      },
-      {
-        meterName: '@opentelemetry/instrumentation-undici',
-        aggregation: { type: AggregationType.DROP },
-      },
-      {
-        instrumentName: 'v8js.gc.duration',
-        aggregation: { type: AggregationType.DROP },
-      },
-    ])
   })
 })
 
