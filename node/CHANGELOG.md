@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/fohte/service-kit/compare/node-v0.1.15...node-v0.1.16) (2026-10-16)
+
+
+### Bug Fixes
+
+* **node:** drop unused instrumentation metrics ([#113](https://github.com/fohte/service-kit/issues/113)) ([073edda](https://github.com/fohte/service-kit/commit/073edda0501c788c56b575a5a85a07d85fdf7bb9))
+
 ## [0.1.15](https://github.com/fohte/service-kit/compare/node-v0.1.14...node-v0.1.15) (2026-10-09)
 
 
