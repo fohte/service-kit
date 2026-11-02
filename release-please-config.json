@@ -24,7 +24,6 @@
       "bump-patch-for-minor-pre-major": true,
       "component": "node"
     },
-
     "rust": {
       "release-type": "rust",
       "bump-minor-pre-major": true,
