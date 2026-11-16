@@ -18,12 +18,18 @@ const smapsFixture = [
   '10000000-10001000 rw-p 00000000 00:00 0 [heap]',
   'Size:                  4 kB',
   'Rss:                   4 kB',
-  '40000000-44000000 rw-p 00000000 00:00 0',
-  'Size:              65536 kB',
+  '40000000-41000000 rw-p 00000000 00:00 0',
+  'Size:              16384 kB',
   'Rss:                   2 kB',
-  '80000000-a0000000 rw-p 00000000 00:00 0',
-  'Size:             524288 kB',
+  '41000000-44000000 ---p 00000000 00:00 0',
+  'Size:              49152 kB',
+  'Rss:                   0 kB',
+  '80000000-80040000 rw-p 00000000 00:00 0',
+  'Size:                 256 kB',
   'Rss:                  12 kB',
+  '80040000-a0000000 ---p 00000000 00:00 0',
+  'Size:             524032 kB',
+  'Rss:                   0 kB',
   'b0000000-b0040000 rw-p 00000000 00:00 0',
   'Size:                 256 kB',
   'Rss:                 256 kB',
@@ -43,8 +49,8 @@ describe('readSmapsRssBreakdown', () => {
   it('groups the main heap and thread arena as glibc and separates V8 from other mappings', () => {
     expect(readSmapsRssBreakdown(smapsFixture)).toEqual({
       glibc: 6 * 1024,
-      v8: 268 * 1024,
-      other: 8 * 1024,
+      v8: 12 * 1024,
+      other: 264 * 1024,
     })
   })
 })
@@ -61,8 +67,8 @@ describe('registerProcessMemoryMetrics', () => {
       smaps: smapsFixture,
       expectedSmaps: [
         { attributes: { region: 'glibc' }, value: 6 * 1024 },
-        { attributes: { region: 'v8' }, value: 268 * 1024 },
-        { attributes: { region: 'other' }, value: 8 * 1024 },
+        { attributes: { region: 'v8' }, value: 12 * 1024 },
+        { attributes: { region: 'other' }, value: 264 * 1024 },
       ],
     },
   ])(

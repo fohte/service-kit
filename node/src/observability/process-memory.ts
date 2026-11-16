@@ -7,13 +7,13 @@ const KIB = 1024
 const MIB = KIB * KIB
 const THREAD_ARENA_SIZE = 64 * MIB
 const V8_RESERVATION_SIZE = 512 * MIB
-const V8_PAGE_SIZE = 256 * KIB
 
 export type SmapsRegion = 'glibc' | 'v8' | 'other'
 
 interface SmapsMapping {
   readonly start: number
   readonly end: number
+  readonly permissions: string
   rss: number
   readonly name: string
 }
@@ -24,7 +24,7 @@ const parseSmapsMappings = (smaps: string): SmapsMapping[] => {
 
   for (const line of smaps.split('\n')) {
     const header =
-      /^([0-9a-f]+)-([0-9a-f]+)\s+\S+\s+\S+\s+\S+\s+\S+(?:\s+(.*))?$/i.exec(
+      /^([0-9a-f]+)-([0-9a-f]+)\s+(\S+)\s+\S+\s+\S+\s+\S+(?:\s+(.*))?$/i.exec(
         line,
       )
     if (header) {
@@ -32,8 +32,9 @@ const parseSmapsMappings = (smaps: string): SmapsMapping[] => {
       current = {
         start: Number.parseInt(header[1] ?? '0', 16),
         end: Number.parseInt(header[2] ?? '0', 16),
+        permissions: header[3] ?? '',
         rss: 0,
-        name: header[3] ?? '',
+        name: header[4] ?? '',
       }
       continue
     }
@@ -93,13 +94,31 @@ const findAlignedRanges = (
   )
 }
 
+const findThreadArenaRanges = (
+  mappings: readonly SmapsMapping[],
+): Set<number> => {
+  const ranges = findAlignedRanges(mappings, THREAD_ARENA_SIZE)
+  return new Set(
+    [...ranges].filter((base) => {
+      const inRange = mappings.filter(
+        (mapping) =>
+          mapping.start < base + THREAD_ARENA_SIZE && mapping.end > base,
+      )
+      return (
+        inRange.some((mapping) => mapping.permissions.includes('w')) &&
+        inRange.some((mapping) => mapping.permissions.startsWith('---'))
+      )
+    }),
+  )
+}
+
 export const readSmapsRssBreakdown = (
   smaps: string,
 ): Record<SmapsRegion, number> => {
   const mappings = parseSmapsMappings(smaps)
   const anonymous = anonymousMappings(mappings)
   const v8Ranges = findAlignedRanges(anonymous, V8_RESERVATION_SIZE)
-  const arenaRanges = findAlignedRanges(anonymous, THREAD_ARENA_SIZE)
+  const arenaRanges = findThreadArenaRanges(anonymous)
 
   const totals: Record<SmapsRegion, number> = {
     glibc: 0,
@@ -124,8 +143,7 @@ export const readSmapsRssBreakdown = (
       mapping.name === '[heap]'
         ? 'glibc'
         : isV8Range ||
-            (isAnonymous && mapping.name.toLowerCase().includes('v8')) ||
-            (isAnonymous && mapping.end - mapping.start === V8_PAGE_SIZE)
+            (isAnonymous && mapping.name.toLowerCase().includes('v8'))
           ? 'v8'
           : isArenaRange
             ? 'glibc'

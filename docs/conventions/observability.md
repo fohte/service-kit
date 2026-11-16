@@ -126,7 +126,7 @@ initObservabilityIfConfigured(process.env)
 
 Metric views drop every instrument from `@opentelemetry/instrumentation-http` and `@opentelemetry/instrumentation-undici`, plus `v8js.gc.duration`. Other runtime metrics and application-created metrics remain available through the configured metrics reader.
 
-`initObservability` also registers gauges for `process.memoryUsage()` RSS, external memory, and array buffers, plus `/proc/self/smaps` RSS grouped into `glibc`, `v8`, and `other`. The `glibc` group combines the main heap and thread arenas. The `smaps` gauge uses only a `region` attribute and is omitted when procfs is unavailable. Together these add at most six series per service. They use the existing periodic reader, whose default export interval is 60 seconds.
+When OTel is enabled, `initObservability` registers gauges for `process.memoryUsage()` RSS, external memory, and array buffers, plus `/proc/self/smaps` RSS grouped into `glibc`, `v8`, and `other`. The smaps gauges are exported only when a metrics reader is configured, use only a `region` attribute, and are omitted when procfs is unavailable. The `glibc` group includes `[heap]` and anonymous mappings inferred to be thread arenas from their aligned 64 MiB range and mixed writable / inaccessible mappings; ambiguous mappings are grouped under `other`. Together these add at most six series per service. They use the existing periodic reader, whose default export interval is 60 seconds.
 
 ### Options
 
