@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/fohte/service-kit/compare/node-v0.1.16...node-v0.1.17) (2026-11-16)
+
+
+### Features
+
+* **node:** visualize process memory breakdown ([#115](https://github.com/fohte/service-kit/issues/115)) ([87d6b8f](https://github.com/fohte/service-kit/commit/87d6b8fb11840a87756eeee67ec7e09226c61397))
+
 ## [0.1.16](https://github.com/fohte/service-kit/compare/node-v0.1.15...node-v0.1.16) (2026-10-16)
 
 
