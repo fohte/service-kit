@@ -8,7 +8,9 @@ const MIB = KIB * KIB
 const THREAD_ARENA_SIZE = 64 * MIB
 const V8_PAGE_SIZE = 256 * KIB
 const V8_PAGE_CLUSTER_SIZE = 16 * MIB
+// A single range of page-sized anonymous mappings may belong to another allocator.
 const MIN_V8_PAGES_PER_CLUSTER = 8
+const MIN_V8_PAGE_CLUSTERS = 2
 
 export type SmapsRegion = 'glibc' | 'v8' | 'other'
 
@@ -65,7 +67,8 @@ const v8PageClusterCounts = (
   for (const mapping of mappings) {
     if (
       !isAnonymousMapping(mapping) ||
-      mapping.end - mapping.start !== V8_PAGE_SIZE
+      mapping.end - mapping.start !== V8_PAGE_SIZE ||
+      mapping.start % V8_PAGE_SIZE !== 0
     ) {
       continue
     }
@@ -108,6 +111,9 @@ export const readSmapsRssBreakdown = (
 ): Record<SmapsRegion, number> => {
   const mappings = parseSmapsMappings(smaps)
   const pageClusters = v8PageClusterCounts(mappings)
+  const populatedV8ClusterCount = [...pageClusters.values()].filter(
+    (count) => count >= MIN_V8_PAGES_PER_CLUSTER,
+  ).length
   const totals: Record<SmapsRegion, number> = {
     glibc: 0,
     v8: 0,
@@ -119,6 +125,8 @@ export const readSmapsRssBreakdown = (
     const isV8PageCluster =
       isAnonymous &&
       mapping.end - mapping.start === V8_PAGE_SIZE &&
+      mapping.start % V8_PAGE_SIZE === 0 &&
+      populatedV8ClusterCount >= MIN_V8_PAGE_CLUSTERS &&
       (pageClusters.get(Math.floor(mapping.start / V8_PAGE_CLUSTER_SIZE)) ??
         0) >= MIN_V8_PAGES_PER_CLUSTER
     const region: SmapsRegion =
@@ -134,12 +142,12 @@ export const readSmapsRssBreakdown = (
   return totals
 }
 
-const readLinuxSmaps = (): SmapsReadResult => {
-  if (process.platform !== 'linux') return undefined
-  return Result.fromThrowable(
-    () => readFileSync('/proc/self/smaps', 'utf8'),
-    (error: unknown) => error,
-  )()
+export const readLinuxSmaps = (
+  platform: NodeJS.Platform = process.platform,
+  readSmaps = (): string => readFileSync('/proc/self/smaps', 'utf8'),
+): SmapsReadResult => {
+  if (platform !== 'linux') return undefined
+  return Result.fromThrowable(readSmaps, (error: unknown) => error)()
 }
 
 export const registerProcessMemoryMetrics = (
@@ -172,12 +180,21 @@ export const registerProcessMemoryMetrics = (
         if (!hasWarnedAboutSmapsRead) {
           hasWarnedAboutSmapsRead = true
           const error = smaps.error
-          logger.warn(
-            {
-              event: 'process_memory_smaps_read_failed',
-              error: error instanceof Error ? error.message : String(error),
+          // A logger failure must not discard observations buffered for this batch.
+          Result.fromThrowable(
+            () => {
+              logger.warn(
+                {
+                  event: 'process_memory_smaps_read_failed',
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                'failed to read process smaps',
+              )
             },
-            'failed to read process smaps',
+            (warningError: unknown) => warningError,
+          )().match(
+            () => undefined,
+            () => undefined,
           )
         }
         return
