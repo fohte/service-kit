@@ -123,7 +123,7 @@ export const initObservability = (
           : {}),
       })
       otelSdk.start()
-      registerProcessMemoryMetrics()
+      registerProcessMemoryMetrics(logger)
       // Run Sentry's self-diagnostic only when both SDKs are wired together,
       // since it inspects the OTel context manager we just installed. It
       // always flags the propagator as missing too, since we deliberately

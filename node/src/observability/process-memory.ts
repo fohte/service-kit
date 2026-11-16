@@ -6,7 +6,9 @@ import { Result } from 'neverthrow'
 const KIB = 1024
 const MIB = KIB * KIB
 const THREAD_ARENA_SIZE = 64 * MIB
-const V8_RESERVATION_SIZE = 512 * MIB
+const V8_PAGE_SIZE = 256 * KIB
+const V8_PAGE_CLUSTER_SIZE = 16 * MIB
+const MIN_V8_PAGES_PER_CLUSTER = 8
 
 export type SmapsRegion = 'glibc' | 'v8' | 'other'
 
@@ -17,6 +19,12 @@ interface SmapsMapping {
   rss: number
   readonly name: string
 }
+
+interface ProcessMemoryLogger {
+  warn(payload: Record<string, unknown>, msg: string): void
+}
+
+type SmapsReadResult = Result<string, unknown> | undefined
 
 const parseSmapsMappings = (smaps: string): SmapsMapping[] => {
   const mappings: SmapsMapping[] = []
@@ -47,68 +55,51 @@ const parseSmapsMappings = (smaps: string): SmapsMapping[] => {
   return mappings
 }
 
-const alignedRangeBases = (
-  mapping: SmapsMapping,
-  rangeSize: number,
-): number[] => {
-  const bases: number[] = []
-  for (
-    let base = Math.floor(mapping.start / rangeSize) * rangeSize;
-    base < mapping.end;
-    base += rangeSize
-  ) {
-    bases.push(base)
+const isAnonymousMapping = (mapping: SmapsMapping): boolean =>
+  mapping.name.length === 0 || /^\[anon:/i.test(mapping.name)
+
+const v8PageClusterCounts = (
+  mappings: readonly SmapsMapping[],
+): Map<number, number> => {
+  const counts = new Map<number, number>()
+  for (const mapping of mappings) {
+    if (
+      !isAnonymousMapping(mapping) ||
+      mapping.end - mapping.start !== V8_PAGE_SIZE
+    ) {
+      continue
+    }
+
+    const cluster = Math.floor(mapping.start / V8_PAGE_CLUSTER_SIZE)
+    counts.set(cluster, (counts.get(cluster) ?? 0) + 1)
   }
-  return bases
+  return counts
 }
 
-const mappedBytesInRange = (
+const isThreadArenaMapping = (
   mappings: readonly SmapsMapping[],
-  start: number,
-  end: number,
-): number =>
-  mappings.reduce(
-    (total, mapping) =>
-      total +
-      Math.max(0, Math.min(mapping.end, end) - Math.max(mapping.start, start)),
-    0,
-  )
+  index: number,
+): boolean => {
+  const mapping = mappings[index]
+  if (!mapping) return false
 
-const anonymousMappings = (mappings: readonly SmapsMapping[]) =>
-  mappings.filter(
-    (mapping) => mapping.name.length === 0 || /^\[anon:/i.test(mapping.name),
-  )
+  const size = mapping.end - mapping.start
+  const hasArenaShape =
+    isAnonymousMapping(mapping) &&
+    mapping.permissions.includes('w') &&
+    mapping.start % THREAD_ARENA_SIZE === 0 &&
+    size > MIB &&
+    size <= THREAD_ARENA_SIZE
+  if (!hasArenaShape) return false
+  if (size === THREAD_ARENA_SIZE) return true
 
-const findAlignedRanges = (
-  mappings: readonly SmapsMapping[],
-  rangeSize: number,
-): Set<number> => {
-  const bases = new Set(
-    mappings.flatMap((mapping) => alignedRangeBases(mapping, rangeSize)),
-  )
-  return new Set(
-    [...bases].filter(
-      (base) =>
-        mappedBytesInRange(mappings, base, base + rangeSize) >= rangeSize,
-    ),
-  )
-}
-
-const findThreadArenaRanges = (
-  mappings: readonly SmapsMapping[],
-): Set<number> => {
-  const ranges = findAlignedRanges(mappings, THREAD_ARENA_SIZE)
-  return new Set(
-    [...ranges].filter((base) => {
-      const inRange = mappings.filter(
-        (mapping) =>
-          mapping.start < base + THREAD_ARENA_SIZE && mapping.end > base,
-      )
-      return (
-        inRange.some((mapping) => mapping.permissions.includes('w')) &&
-        inRange.some((mapping) => mapping.permissions.startsWith('---'))
-      )
-    }),
+  const guardMapping = mappings[index + 1]
+  return (
+    guardMapping !== undefined &&
+    guardMapping.start === mapping.end &&
+    guardMapping.end === mapping.start + THREAD_ARENA_SIZE &&
+    guardMapping.permissions.startsWith('---') &&
+    isAnonymousMapping(guardMapping)
   )
 }
 
@@ -116,51 +107,43 @@ export const readSmapsRssBreakdown = (
   smaps: string,
 ): Record<SmapsRegion, number> => {
   const mappings = parseSmapsMappings(smaps)
-  const anonymous = anonymousMappings(mappings)
-  const v8Ranges = findAlignedRanges(anonymous, V8_RESERVATION_SIZE)
-  const arenaRanges = findThreadArenaRanges(anonymous)
-
+  const pageClusters = v8PageClusterCounts(mappings)
   const totals: Record<SmapsRegion, number> = {
     glibc: 0,
     v8: 0,
     other: 0,
   }
 
-  for (const mapping of mappings) {
-    const isAnonymous =
-      mapping.name.length === 0 || /^\[anon:/i.test(mapping.name)
-    const isV8Range =
+  for (const [index, mapping] of mappings.entries()) {
+    const isAnonymous = isAnonymousMapping(mapping)
+    const isV8PageCluster =
       isAnonymous &&
-      alignedRangeBases(mapping, V8_RESERVATION_SIZE).some((base) =>
-        v8Ranges.has(base),
-      )
-    const isArenaRange =
-      isAnonymous &&
-      alignedRangeBases(mapping, THREAD_ARENA_SIZE).some((base) =>
-        arenaRanges.has(base),
-      )
+      mapping.end - mapping.start === V8_PAGE_SIZE &&
+      (pageClusters.get(Math.floor(mapping.start / V8_PAGE_CLUSTER_SIZE)) ??
+        0) >= MIN_V8_PAGES_PER_CLUSTER
     const region: SmapsRegion =
-      mapping.name === '[heap]'
+      mapping.name === '[heap]' || isThreadArenaMapping(mappings, index)
         ? 'glibc'
-        : isV8Range ||
-            (isAnonymous && mapping.name.toLowerCase().includes('v8'))
+        : isAnonymous &&
+            (mapping.name.toLowerCase().includes('v8') || isV8PageCluster)
           ? 'v8'
-          : isArenaRange
-            ? 'glibc'
-            : 'other'
+          : 'other'
     totals[region] += mapping.rss
   }
 
   return totals
 }
 
-const readLinuxSmaps = (): string | undefined =>
-  Result.fromThrowable(
+const readLinuxSmaps = (): SmapsReadResult => {
+  if (process.platform !== 'linux') return undefined
+  return Result.fromThrowable(
     () => readFileSync('/proc/self/smaps', 'utf8'),
-    () => undefined,
-  )().unwrapOr(undefined)
+    (error: unknown) => error,
+  )()
+}
 
 export const registerProcessMemoryMetrics = (
+  logger: ProcessMemoryLogger,
   getSmaps = readLinuxSmaps,
 ): void => {
   const meter = metrics.getMeter('@fohte/service-kit/observability')
@@ -174,22 +157,37 @@ export const registerProcessMemoryMetrics = (
   const smapsRss = meter.createObservableGauge(
     'nodejs.process.memory.smaps.rss.bytes',
   )
+  let hasWarnedAboutSmapsRead = false
 
-  rss.addCallback((result) => {
-    result.observe(process.memoryUsage().rss)
-  })
-  external.addCallback((result) => {
-    result.observe(process.memoryUsage().external)
-  })
-  arrayBuffers.addCallback((result) => {
-    result.observe(process.memoryUsage().arrayBuffers)
-  })
-  smapsRss.addCallback((result) => {
-    const smaps = getSmaps()
-    if (smaps === undefined) return
-    const breakdown = readSmapsRssBreakdown(smaps)
-    for (const [region, value] of Object.entries(breakdown)) {
-      result.observe(value, { region })
-    }
-  })
+  meter.addBatchObservableCallback(
+    (result) => {
+      const memoryUsage = process.memoryUsage()
+      result.observe(rss, memoryUsage.rss)
+      result.observe(external, memoryUsage.external)
+      result.observe(arrayBuffers, memoryUsage.arrayBuffers)
+
+      const smaps = getSmaps()
+      if (smaps === undefined) return
+      if (!smaps.isOk()) {
+        if (!hasWarnedAboutSmapsRead) {
+          hasWarnedAboutSmapsRead = true
+          const error = smaps.error
+          logger.warn(
+            {
+              event: 'process_memory_smaps_read_failed',
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'failed to read process smaps',
+          )
+        }
+        return
+      }
+
+      const breakdown = readSmapsRssBreakdown(smaps.value)
+      for (const [region, value] of Object.entries(breakdown)) {
+        result.observe(smapsRss, value, { region })
+      }
+    },
+    [rss, external, arrayBuffers, smapsRss],
+  )
 }
