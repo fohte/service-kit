@@ -27,6 +27,15 @@ const smapsMapping = (
     `Rss: ${rssKb.toString()} kB`,
   ].join('\n')
 
+const sparseV8PagesFixture = Array.from({ length: 16 }, (_, index) => {
+  const start = 0x100000000 + index * 0x1000000
+  return smapsMapping(
+    `${start.toString(16)}-${(start + 0x40000).toString(16)}`,
+    'rw-p',
+    256,
+  )
+}).join('\n')
+
 const smapsFixture = [
   smapsMapping('10000000-10001000', 'rw-p', 4, '[heap]'),
   smapsMapping('20000000-21000000', 'rw-p', 16384),
@@ -34,47 +43,12 @@ const smapsFixture = [
   smapsMapping('40aaa000-44000000', '---p', 0),
   smapsMapping('50000000-54000000', 'rw-p', 3),
   smapsMapping('c0000000-c0001000', 'rw-p', 8, '/usr/lib/libexample.so'),
-  smapsMapping('100000000-100040000', 'rw-p', 256),
-  smapsMapping('100080000-1000c0000', 'rw-p', 256),
-  smapsMapping('100100000-100140000', 'rw-p', 256),
-  smapsMapping('100180000-1001c0000', 'rw-p', 256),
-  smapsMapping('100200000-100240000', 'rw-p', 256),
-  smapsMapping('100280000-1002c0000', 'rw-p', 256),
-  smapsMapping('100300000-100340000', 'rw-p', 256),
-  smapsMapping('100380000-1003c0000', 'rw-p', 256),
-  smapsMapping('101000000-101040000', 'rw-p', 256),
-  smapsMapping('101080000-1010c0000', 'rw-p', 256),
-  smapsMapping('101100000-101140000', 'rw-p', 256),
-  smapsMapping('101180000-1011c0000', 'rw-p', 256),
-  smapsMapping('101200000-101240000', 'rw-p', 256),
-  smapsMapping('101280000-1012c0000', 'rw-p', 256),
-  smapsMapping('101300000-101340000', 'rw-p', 256),
-  smapsMapping('101380000-1013c0000', 'rw-p', 256),
-  smapsMapping('200000000-200040000', 'rw-p', 256),
+  sparseV8PagesFixture,
+  smapsMapping('200001000-200041000', 'rw-p', 256),
   smapsMapping('8101200000-8121200000', 'rw-p', 12288),
 ].join('\n')
 
-const singleV8PageClusterFixture = [
-  smapsMapping('100000000-100040000', 'rw-p', 256),
-  smapsMapping('100080000-1000c0000', 'rw-p', 256),
-  smapsMapping('100100000-100140000', 'rw-p', 256),
-  smapsMapping('100180000-1001c0000', 'rw-p', 256),
-  smapsMapping('100200000-100240000', 'rw-p', 256),
-  smapsMapping('100280000-1002c0000', 'rw-p', 256),
-  smapsMapping('100300000-100340000', 'rw-p', 256),
-  smapsMapping('100380000-1003c0000', 'rw-p', 256),
-].join('\n')
-
-const unalignedV8PageClusterFixture = [
-  smapsMapping('100001000-100041000', 'rw-p', 256),
-  smapsMapping('100081000-1000c1000', 'rw-p', 256),
-  smapsMapping('100101000-100141000', 'rw-p', 256),
-  smapsMapping('100181000-1001c1000', 'rw-p', 256),
-  smapsMapping('100201000-100241000', 'rw-p', 256),
-  smapsMapping('100281000-1002c1000', 'rw-p', 256),
-  smapsMapping('100301000-100341000', 'rw-p', 256),
-  smapsMapping('100381000-1003c1000', 'rw-p', 256),
-].join('\n')
+const unalignedV8PageFixture = smapsMapping('100001000-100041000', 'rw-p', 256)
 
 const metricSnapshot = (
   exported: unknown,
@@ -99,7 +73,7 @@ afterEach(async () => {
 })
 
 describe('readSmapsRssBreakdown', () => {
-  it('classifies arena-shaped mappings and clustered V8 pages while leaving ambiguous mappings in other', () => {
+  it('classifies arena-shaped mappings and scattered V8 pages while leaving ambiguous mappings in other', () => {
     expect(readSmapsRssBreakdown(smapsFixture)).toEqual({
       glibc: 9 * 1024,
       v8: 4 * 1024 * 1024,
@@ -109,14 +83,19 @@ describe('readSmapsRssBreakdown', () => {
 
   it.each([
     {
-      name: 'eight aligned pages in one range without a second V8 cluster',
-      smaps: singleV8PageClusterFixture,
-      expected: { glibc: 0, v8: 0, other: 2 * 1024 * 1024 },
+      name: 'one aligned anonymous V8-sized page',
+      smaps: smapsMapping('100000000-100040000', 'rw-p', 256),
+      expected: { glibc: 0, v8: 256 * 1024, other: 0 },
     },
     {
-      name: 'unaligned anonymous mappings with the V8 page size',
-      smaps: unalignedV8PageClusterFixture,
-      expected: { glibc: 0, v8: 0, other: 2 * 1024 * 1024 },
+      name: 'a V8-named anonymous mapping',
+      smaps: smapsMapping('30000000-30200000', 'rw-p', 1536, '[anon:V8 Heap]'),
+      expected: { glibc: 0, v8: 1536 * 1024, other: 0 },
+    },
+    {
+      name: 'an unaligned anonymous mapping with the V8 page size',
+      smaps: unalignedV8PageFixture,
+      expected: { glibc: 0, v8: 0, other: 256 * 1024 },
     },
     {
       name: 'a fully used arena without a guard mapping',

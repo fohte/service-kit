@@ -7,10 +7,6 @@ const KIB = 1024
 const MIB = KIB * KIB
 const THREAD_ARENA_SIZE = 64 * MIB
 const V8_PAGE_SIZE = 256 * KIB
-const V8_PAGE_CLUSTER_SIZE = 16 * MIB
-// A single range of page-sized anonymous mappings may belong to another allocator.
-const MIN_V8_PAGES_PER_CLUSTER = 8
-const MIN_V8_PAGE_CLUSTERS = 2
 
 export type SmapsRegion = 'glibc' | 'v8' | 'other'
 
@@ -60,25 +56,6 @@ const parseSmapsMappings = (smaps: string): SmapsMapping[] => {
 const isAnonymousMapping = (mapping: SmapsMapping): boolean =>
   mapping.name.length === 0 || /^\[anon:/i.test(mapping.name)
 
-const v8PageClusterCounts = (
-  mappings: readonly SmapsMapping[],
-): Map<number, number> => {
-  const counts = new Map<number, number>()
-  for (const mapping of mappings) {
-    if (
-      !isAnonymousMapping(mapping) ||
-      mapping.end - mapping.start !== V8_PAGE_SIZE ||
-      mapping.start % V8_PAGE_SIZE !== 0
-    ) {
-      continue
-    }
-
-    const cluster = Math.floor(mapping.start / V8_PAGE_CLUSTER_SIZE)
-    counts.set(cluster, (counts.get(cluster) ?? 0) + 1)
-  }
-  return counts
-}
-
 const isThreadArenaMapping = (
   mappings: readonly SmapsMapping[],
   index: number,
@@ -110,10 +87,6 @@ export const readSmapsRssBreakdown = (
   smaps: string,
 ): Record<SmapsRegion, number> => {
   const mappings = parseSmapsMappings(smaps)
-  const pageClusters = v8PageClusterCounts(mappings)
-  const populatedV8ClusterCount = [...pageClusters.values()].filter(
-    (count) => count >= MIN_V8_PAGES_PER_CLUSTER,
-  ).length
   const totals: Record<SmapsRegion, number> = {
     glibc: 0,
     v8: 0,
@@ -122,18 +95,14 @@ export const readSmapsRssBreakdown = (
 
   for (const [index, mapping] of mappings.entries()) {
     const isAnonymous = isAnonymousMapping(mapping)
-    const isV8PageCluster =
+    const isV8Page =
       isAnonymous &&
       mapping.end - mapping.start === V8_PAGE_SIZE &&
-      mapping.start % V8_PAGE_SIZE === 0 &&
-      populatedV8ClusterCount >= MIN_V8_PAGE_CLUSTERS &&
-      (pageClusters.get(Math.floor(mapping.start / V8_PAGE_CLUSTER_SIZE)) ??
-        0) >= MIN_V8_PAGES_PER_CLUSTER
+      mapping.start % V8_PAGE_SIZE === 0
     const region: SmapsRegion =
       mapping.name === '[heap]' || isThreadArenaMapping(mappings, index)
         ? 'glibc'
-        : isAnonymous &&
-            (mapping.name.toLowerCase().includes('v8') || isV8PageCluster)
+        : isAnonymous && (mapping.name.toLowerCase().includes('v8') || isV8Page)
           ? 'v8'
           : 'other'
     totals[region] += mapping.rss
