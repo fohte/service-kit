@@ -5,6 +5,15 @@
     'github>fohte/renovate-config:node.json5',
     'github>fohte/renovate-config:rust.json5',
   ],
+  packageRules: [
+    {
+      // @bufbuild/protoc-gen-es requires the exact same @bufbuild/protobuf version, but the
+      // preset's "devDependencies (non-major)" group pulls protoc-gen-es away from protobuf.
+      // @bufbuild/buf comes from bufbuild/buf and stays in that automerged group.
+      matchSourceUrls: ['https://github.com/bufbuild/protobuf-es'],
+      groupName: 'protobuf-es monorepo',
+    },
+  ],
   customManagers: [
     {
       customType: 'regex',
