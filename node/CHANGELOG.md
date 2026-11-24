@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/fohte/service-kit/compare/node-v0.1.17...node-v0.1.18) (2026-11-24)
+
+
+### Features
+
+* **node:** re-export Sentry `captureException` ([#117](https://github.com/fohte/service-kit/issues/117)) ([13f4e40](https://github.com/fohte/service-kit/commit/13f4e402de8b22674295995a41eecaf3fa1e0097))
+
 ## [0.1.17](https://github.com/fohte/service-kit/compare/node-v0.1.16...node-v0.1.17) (2026-11-16)
 
 
