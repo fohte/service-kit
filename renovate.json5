@@ -5,6 +5,12 @@
     'github>fohte/renovate-config:node.json5',
     'github>fohte/renovate-config:rust.json5',
   ],
+  packageRules: [
+    {
+      matchSourceUrls: ['https://github.com/bufbuild/protobuf-es'],
+      groupName: 'protobuf-es monorepo',
+    },
+  ],
   customManagers: [
     {
       customType: 'regex',
