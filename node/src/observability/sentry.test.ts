@@ -5,11 +5,17 @@ import { describe, expect, it, vi } from 'vitest'
 // (which registers global instrumentation on import). Tests in this file
 // only exercise our own logic: env validation in initSentry and the pure
 // transformations in redactEvent.
-vi.mock('@sentry/node', () => ({ init: vi.fn() }))
+vi.mock('@sentry/node', () => ({ init: vi.fn(), captureException: vi.fn() }))
 
-const { init: sentryInit } = await import('@sentry/node')
-const { NOISE_PATTERNS, initSentry, isSentryConfigured, redactEvent } =
-  await import('#observability/sentry')
+const { captureException: sentryCaptureException, init: sentryInit } =
+  await import('@sentry/node')
+const {
+  captureException,
+  NOISE_PATTERNS,
+  initSentry,
+  isSentryConfigured,
+  redactEvent,
+} = await import('#observability/index')
 
 // `beforeSend` is a fresh closure on every `initSentry` call, so it can never
 // equal a fixed expected value — replace it with its (stable) typeof before
@@ -62,6 +68,16 @@ describe('initSentry', () => {
       beforeSend: 'function',
       ignoreErrors: NOISE_PATTERNS,
     })
+  })
+})
+
+describe('captureException', () => {
+  it('forwards exceptions to the Sentry SDK used by the observability entrypoint', () => {
+    const exception = new Error('request failed')
+
+    captureException(exception)
+
+    expect(vi.mocked(sentryCaptureException).mock.calls).toEqual([[exception]])
   })
 })
 

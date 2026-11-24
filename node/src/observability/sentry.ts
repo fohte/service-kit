@@ -15,6 +15,7 @@ import {
 } from '../redact'
 
 export { DEFAULT_SECRET_KEY_PATTERNS, type StringTruncator } from '../redact'
+export { captureException } from '@sentry/node'
 
 export interface SentryEnv {
   readonly SENTRY_DSN?: string | undefined

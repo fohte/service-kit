@@ -15,6 +15,7 @@ export {
   type OtelOptions,
 } from './otel'
 export {
+  captureException,
   captureWithFingerprint,
   type CaptureWithFingerprintContext,
   DEFAULT_SECRET_KEY_PATTERNS,
