@@ -1,21 +1,14 @@
 import type { NodeClient } from '@sentry/node'
 import { describe, expect, it, vi } from 'vitest'
 
-// Stub @sentry/node so importing this module does not load the real SDK
-// (which registers global instrumentation on import). Tests in this file
-// only exercise our own logic: env validation in initSentry and the pure
-// transformations in redactEvent.
+// Stub @sentry/node so importing the Sentry module does not load the real SDK
+// (which registers global instrumentation on import).
 vi.mock('@sentry/node', () => ({ init: vi.fn(), captureException: vi.fn() }))
 
 const { captureException: sentryCaptureException, init: sentryInit } =
   await import('@sentry/node')
-const {
-  captureException,
-  NOISE_PATTERNS,
-  initSentry,
-  isSentryConfigured,
-  redactEvent,
-} = await import('#observability/index')
+const { NOISE_PATTERNS, initSentry, isSentryConfigured, redactEvent } =
+  await import('#observability/sentry')
 
 // `beforeSend` is a fresh closure on every `initSentry` call, so it can never
 // equal a fixed expected value — replace it with its (stable) typeof before
@@ -72,8 +65,9 @@ describe('initSentry', () => {
 })
 
 describe('captureException', () => {
-  it('forwards exceptions to the Sentry SDK used by the observability entrypoint', () => {
+  it('forwards exceptions to the Sentry SDK used by the observability entrypoint', async () => {
     const exception = new Error('request failed')
+    const { captureException } = await import('#observability/index')
 
     captureException(exception)
 
