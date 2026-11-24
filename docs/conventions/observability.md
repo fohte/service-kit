@@ -88,7 +88,7 @@ On the Rust side, `Drop` is synchronous (Rust has no async `Drop`), so Sentry's 
 
 ### API
 
-`@fohte/service-kit/observability` exports `initObservability` as the entry point integrators are expected to call, plus the low-level building blocks (`createNodeSdk`, `initSentry`, `redactEvent`, `captureWithFingerprint`) used to assemble it.
+`@fohte/service-kit/observability` exports `initObservability` as the entry point integrators are expected to call, plus the low-level building blocks (`createNodeSdk`, `initSentry`, `redactEvent`, `captureWithFingerprint`) used to assemble it. It also exports `captureException` for sending exceptions through the initialized Sentry SDK.
 
 ```ts
 import { initObservability } from '@fohte/service-kit/observability'
@@ -171,7 +171,15 @@ The registration is unconditional: passing `--import` is itself the opt-in, so i
 
 ### Dependencies
 
-`@sentry/node` and the `@opentelemetry/*` packages other than `@opentelemetry/api` are declared as regular `dependencies` — consumers get a working install without pinning every OTel/Sentry package themselves. Only `@opentelemetry/api` stays a `peerDependency` (with `peerDependenciesMeta.optional`), since the OTel API forbids multiple instances in one process: a consumer that calls the API directly (e.g. `trace.getTracer()`) must resolve the same instance the kit uses internally. Install it explicitly, matching the peer range: `pnpm add @opentelemetry/api@^1.9.1`.
+`@sentry/node` and the `@opentelemetry/*` packages other than `@opentelemetry/api` are declared as regular `dependencies` — consumers get a working install without pinning every OTel/Sentry package themselves. Consumers that need to capture exceptions should import `captureException` from `@fohte/service-kit/observability` instead of adding a direct `@sentry/node` dependency, so events use the SDK instance initialized by the kit.
+
+```ts
+import { captureException } from '@fohte/service-kit/observability'
+
+captureException(new Error('request failed'))
+```
+
+Only `@opentelemetry/api` stays a `peerDependency` (with `peerDependenciesMeta.optional`), since the OTel API forbids multiple instances in one process: a consumer that calls the API directly (e.g. `trace.getTracer()`) must resolve the same instance the kit uses internally. Install it explicitly, matching the peer range: `pnpm add @opentelemetry/api@^1.9.1`.
 
 ## Rust
 
