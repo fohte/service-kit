@@ -7,8 +7,8 @@
   ],
   packageRules: [
     {
-      // @bufbuild/protoc-gen-es requires the exact @bufbuild/protobuf version, but protobuf-es
-      // isn't in group:monorepos, so the preset's "devDependencies (non-major)" group splits them.
+      // @bufbuild/protoc-gen-es requires the exact same @bufbuild/protobuf version, but the
+      // preset's "devDependencies (non-major)" group pulls protoc-gen-es away from protobuf.
       // @bufbuild/buf comes from bufbuild/buf and stays in that automerged group.
       matchSourceUrls: ['https://github.com/bufbuild/protobuf-es'],
       groupName: 'protobuf-es monorepo',
