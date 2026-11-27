@@ -7,11 +7,11 @@
   ],
   packageRules: [
     {
-      // @bufbuild/protoc-gen-es requires the exact same @bufbuild/protobuf version, but the
-      // preset's "devDependencies (non-major)" group pulls protoc-gen-es away from protobuf.
-      // @bufbuild/buf comes from bufbuild/buf and stays in that automerged group.
-      matchSourceUrls: ['https://github.com/bufbuild/protobuf-es'],
-      groupName: 'protobuf-es monorepo',
+      // Keep the toolchain together because its generated code is part of the published package.
+      // Avoid the preset's chore: prefix so toolchain updates trigger a release.
+      matchPackageNames: ['@bufbuild/**'],
+      groupName: 'bufbuild',
+      commitMessagePrefix: null,
     },
   ],
   customManagers: [
