@@ -88,15 +88,13 @@ jobs:
       - name: Fetch cargo dependencies (rust)
         run: cd "rust" && cargo fetch
 
-      # Only runs when the octo-sts/app pin in scripts/vendor-octo-sts-proto
-      # changed (e.g. a Renovate PR). The result rides the commit-action step
-      # below instead of a separate push, so only one job ever pushes to this
-      # branch.
-      - name: Regenerate octo-sts proto vendor
+      - name: Update octo-sts proto vendor
         if: needs.detect-changes.outputs.octo-sts-proto == 'true'
-        run: |
-          scripts/vendor-octo-sts-proto
-          cd node && pnpm run generate
+        run: scripts/vendor-octo-sts-proto
+
+      # Generated code depends on the protoc-gen-es and buf versions, not just the vendored proto, so regenerate on every run.
+      - name: Regenerate octo-sts proto code
+        run: cd node && pnpm run generate
 
       - name: Run lefthook
         id: lefthook
