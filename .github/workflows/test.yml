@@ -88,7 +88,7 @@ jobs:
       - name: Fetch cargo dependencies (rust)
         run: cd "rust" && cargo fetch
 
-      # Only update the vendored proto source when its upstream pin changes.
+      # Update the vendored proto source whenever the vendor script changes.
       - name: Update octo-sts proto vendor
         if: needs.detect-changes.outputs.octo-sts-proto == 'true'
         run: scripts/vendor-octo-sts-proto
