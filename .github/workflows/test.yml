@@ -88,11 +88,11 @@ jobs:
       - name: Fetch cargo dependencies (rust)
         run: cd "rust" && cargo fetch
 
-      # Update the vendored proto source whenever the vendor script changes.
       - name: Update octo-sts proto vendor
         if: needs.detect-changes.outputs.octo-sts-proto == 'true'
         run: scripts/vendor-octo-sts-proto
 
+      # Generated code depends on the protoc-gen-es and buf versions, not just the vendored proto, so regenerate on every run.
       - name: Regenerate octo-sts proto code
         run: cd node && pnpm run generate
 
