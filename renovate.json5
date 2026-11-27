@@ -7,8 +7,11 @@
   ],
   packageRules: [
     {
-      // Keep the toolchain together because its generated code is part of the published package.
-      // Avoid the preset's chore: prefix so toolchain updates trigger a release.
+      // @bufbuild/protoc-gen-es requires @bufbuild/protobuf as a peer at the exact same version,
+      // but the preset's "devDependencies (non-major)" group separates them.
+      // The first upgrade is @bufbuild/buf, a devDependency that inherits the preset's chore: prefix.
+      // Clear that prefix to use deps:, so toolchain updates that affect published generated code
+      // trigger a release.
       matchPackageNames: ['@bufbuild/**'],
       groupName: 'bufbuild',
       commitMessagePrefix: null,
